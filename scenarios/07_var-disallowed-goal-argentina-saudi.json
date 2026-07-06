@@ -1,0 +1,12 @@
+{
+  "name": "VAR-corrected regulation scoreline",
+  "real_match": "Argentina vs Saudi Arabia, 2022 WC Group Stage",
+  "note": "Argentina had three goals ruled out for offside by VAR review; the recorded 90' score reflects the corrected scoreline (1-2), which is what the market settles on, not the raw pre-review count.",
+  "home_goals": 1,
+  "away_goals": 2,
+  "status": "Completed",
+  "fee_bps": 300,
+  "pools": { "home": 5000000, "draw": 1000000, "away": 200000 },
+  "expected_outcome": "Away",
+  "expected_paid_as_refund": false
+}

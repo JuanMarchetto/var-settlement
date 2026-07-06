@@ -1,0 +1,12 @@
+{
+  "name": "Knockout tie decided in extra time settles as Draw",
+  "real_match": "Germany vs Algeria, 2014 WC Round of 16",
+  "note": "0-0 at 90 minutes; Germany won 2-1 after extra time (Schurrle, Ozil), but the 1X2 market is on the 90' scoreline so it settles Draw.",
+  "home_goals": 0,
+  "away_goals": 0,
+  "status": "CompletedAfterExtraTime",
+  "fee_bps": 0,
+  "pools": { "home": 3000000, "draw": 500000, "away": 800000 },
+  "expected_outcome": "Draw",
+  "expected_paid_as_refund": false
+}

@@ -1,0 +1,12 @@
+{
+  "name": "Match explicitly voided",
+  "real_match": "France vs Poland, 2022 WC Round of 16 (hypothetical: result voided after a post-match integrity investigation)",
+  "note": "Hypothetical governance action. Goals are recorded as played (3-1) to prove that a Void status forces Refund independent of the scoreline.",
+  "home_goals": 3,
+  "away_goals": 1,
+  "status": "Void",
+  "fee_bps": 0,
+  "pools": { "home": 4200000, "draw": 600000, "away": 900000 },
+  "expected_outcome": "Refund",
+  "expected_paid_as_refund": true
+}

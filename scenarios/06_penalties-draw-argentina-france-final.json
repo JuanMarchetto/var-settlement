@@ -1,0 +1,12 @@
+{
+  "name": "Knockout tie decided on penalties settles as Draw",
+  "real_match": "Argentina vs France, 2022 WC Final",
+  "note": "2-2 at 90 minutes (Messi, Di Maria vs two late Mbappe goals); 3-3 after extra time, Argentina won 4-2 on penalties. Market settles on the 90' score, so this is a Draw despite the shootout result.",
+  "home_goals": 2,
+  "away_goals": 2,
+  "status": "CompletedAfterPenalties",
+  "fee_bps": 0,
+  "pools": { "home": 4000000, "draw": 2000000, "away": 3500000 },
+  "expected_outcome": "Draw",
+  "expected_paid_as_refund": false
+}

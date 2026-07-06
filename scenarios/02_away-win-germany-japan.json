@@ -1,0 +1,12 @@
+{
+  "name": "Ordinary away win",
+  "real_match": "Germany vs Japan, 2022 WC Group Stage",
+  "note": "Away upset in regulation time (Japan came from behind 1-2); tests home-favorite pools losing to away side.",
+  "home_goals": 1,
+  "away_goals": 2,
+  "status": "Completed",
+  "fee_bps": 150,
+  "pools": { "home": 6000000, "draw": 900000, "away": 1100000 },
+  "expected_outcome": "Away",
+  "expected_paid_as_refund": false
+}

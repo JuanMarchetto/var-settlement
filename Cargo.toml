@@ -1,0 +1,6 @@
+[workspace]
+members = ["crates/rulebook", "programs/var-settlement"]
+resolver = "2"
+
+[profile.release]
+overflow-checks = true

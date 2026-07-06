@@ -1,0 +1,12 @@
+{
+  "name": "Regulation draw with goals on both sides",
+  "real_match": "Netherlands vs Ecuador, 2022 WC Group Stage",
+  "note": "Group stage match, no extra time applies; both teams score (1-1) so this exercises the non-goalless draw path.",
+  "home_goals": 1,
+  "away_goals": 1,
+  "status": "Completed",
+  "fee_bps": 0,
+  "pools": { "home": 2000000, "draw": 1500000, "away": 1800000 },
+  "expected_outcome": "Draw",
+  "expected_paid_as_refund": false
+}

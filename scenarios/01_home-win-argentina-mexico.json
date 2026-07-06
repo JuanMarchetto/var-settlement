@@ -1,0 +1,12 @@
+{
+  "name": "Ordinary home win",
+  "real_match": "Argentina vs Mexico, 2022 WC Group Stage",
+  "note": "Baseline decisive home win in regulation time; Messi and Enzo Fernandez goals, no ambiguity.",
+  "home_goals": 2,
+  "away_goals": 0,
+  "status": "Completed",
+  "fee_bps": 0,
+  "pools": { "home": 5000000, "draw": 800000, "away": 1200000 },
+  "expected_outcome": "Home",
+  "expected_paid_as_refund": false
+}

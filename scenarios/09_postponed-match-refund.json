@@ -1,0 +1,12 @@
+{
+  "name": "Match postponed before kickoff",
+  "real_match": "England vs USA, 2022 WC Group Stage (hypothetical: postponed due to severe weather, rescheduled outside the settlement window)",
+  "note": "Hypothetical, since no 2022 WC fixture was postponed. Never kicked off, so goals are recorded as 0-0 and the market refunds.",
+  "home_goals": 0,
+  "away_goals": 0,
+  "status": "Postponed",
+  "fee_bps": 0,
+  "pools": { "home": 1800000, "draw": 400000, "away": 1600000 },
+  "expected_outcome": "Refund",
+  "expected_paid_as_refund": true
+}

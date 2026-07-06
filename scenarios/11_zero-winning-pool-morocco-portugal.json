@@ -1,0 +1,12 @@
+{
+  "name": "Decisive result with an empty winning pool",
+  "real_match": "Morocco vs Portugal, 2022 WC Quarter-Final",
+  "note": "Morocco's 1-0 upset (En-Nesyri header) is a real decisive Home result, but this scenario sets the home pool to zero as if nobody backed the upset; outcome is still Home, and since the winning bucket is empty stakes must be refunded rather than distributed.",
+  "home_goals": 1,
+  "away_goals": 0,
+  "status": "Completed",
+  "fee_bps": 0,
+  "pools": { "home": 0, "draw": 1500000, "away": 8000000 },
+  "expected_outcome": "Home",
+  "expected_paid_as_refund": true
+}

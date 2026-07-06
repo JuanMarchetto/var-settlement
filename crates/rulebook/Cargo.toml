@@ -1,0 +1,18 @@
+[package]
+name = "rulebook"
+version = "0.1.0"
+edition = "2021"
+description = "Deterministic, formally-verified football match-result resolution and parimutuel settlement for VAR."
+license = "MIT"
+
+# Pure and dependency-free on purpose: this crate is the formally-verified core.
+# It links unchanged into the Anchor program AND is independently checked with `cargo kani`.
+[dependencies]
+
+[dev-dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[lints.rust]
+# `kani` cfg is set only by `cargo kani`; declare it so normal builds don't warn.
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(kani)'] }

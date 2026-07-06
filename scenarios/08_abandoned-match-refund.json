@@ -1,0 +1,12 @@
+{
+  "name": "Match abandoned mid-second-half",
+  "real_match": "Brazil vs Serbia, 2022 WC Group Stage (hypothetical: abandoned at 80' due to floodlight failure)",
+  "note": "No real WC match has been abandoned this late; this is a realistic hypothetical. Abandoned matches void the market regardless of the in-progress scoreline.",
+  "home_goals": 1,
+  "away_goals": 0,
+  "status": "Abandoned",
+  "fee_bps": 0,
+  "pools": { "home": 2000000, "draw": 500000, "away": 700000 },
+  "expected_outcome": "Refund",
+  "expected_paid_as_refund": true
+}

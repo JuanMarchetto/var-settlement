@@ -1,0 +1,12 @@
+{
+  "name": "High-scoring decisive game with nonzero fee",
+  "real_match": "Brazil vs Chile, 1962 WC Semi-Final",
+  "note": "Brazil won 4-2 in regulation (Garrincha and Vava braces); used to exercise fee-bps math on a large, non-round payout with a healthy winning pool.",
+  "home_goals": 4,
+  "away_goals": 2,
+  "status": "Completed",
+  "fee_bps": 250,
+  "pools": { "home": 5000000, "draw": 1200000, "away": 2000000 },
+  "expected_outcome": "Home",
+  "expected_paid_as_refund": false
+}
