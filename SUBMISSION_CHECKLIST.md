@@ -32,15 +32,18 @@ Status for the same claims in narrative form.
       (`litesvm` in-process tests were blocked offline by an `openssl-sys` build dep, so the check is
       done directly on devnet instead — stronger evidence anyway.)
 
+## Done — LIVE Tx LINE
+
+- [x] **Live Tx LINE activation.** `tests-devnet/txline-activate.ts` — real `subscribe(1,4)` on the
+      devnet `Txoracle`, guest JWT, wallet-signed message, `/api/token/activate` -> live API token.
+- [x] **Settled one real market against the live feed.** `tests-devnet/txline-settle.ts` — fixture
+      18192996 (home 2 - 3 away), authenticated via live `stat-validation` Merkle proofs, resolved by
+      two-step CPI into the **real** `Txoracle::validate_stat` over the on-chain daily root; receipt
+      outcome **Away**, `reverify() -> true`, winner paid. See `DEPLOYMENTS.md`. (Not simulated.)
+
 ## Remaining gates before submission
 
-- [ ] **Live Tx LINE activation.** Run the 4-step activation (`packages/sdk/src/txline.ts::activate`)
-      for real against a funded wallet — the free World Cup tier is verified reachable and coded, but
-      `subscribe()` is currently a stub that throws until it's wired against a live `subscribe`
-      transaction.
-- [ ] **Settle one real market.** Create a market for a real fixture, take deposits, resolve it
-      against the live Tx LINE feed (devnet L1 or mainnet, per `spec.md`'s descope ladder), claim
-      payouts, and get a `true` from `reverify()` — the actual end-to-end proof, not a simulated one.
+- [ ] **Mainnet run** (real-time L12) and a `Completed`-status finished fixture for a production market.
 - [ ] **Record demo video.** `docs/DEMO_VIDEO_SCRIPT.md` is the shot list (hook → create/deposit →
       resolve-with-proof → reverify green check → penalties/abandonment edge cases → `cargo kani`
       PASS). Not recorded yet.

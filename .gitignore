@@ -3,3 +3,5 @@
 node_modules
 .anchor
 test-ledger
+.gstack/
+tests-devnet/.txline-creds.json

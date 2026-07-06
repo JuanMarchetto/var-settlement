@@ -35,7 +35,26 @@ vault=2 (the 2% protocol fee) — exactly the settlement math the rulebook speci
 
 Re-run: `cd tests-devnet && bun install && bun run smoke.ts` (uses a fresh fixture id each run).
 
-## Next (needs the live Tx LINE feed)
-Point a market at the real `Txoracle` (devnet `6pW64gN1s2uqjHkn1unFeEjAwJkPGHoppGvS715wyP2J`),
-complete the 4-step activation, fetch a real `stat-validation` proof, and settle one real World Cup
-fixture against the on-chain daily Merkle root.
+## LIVE Tx LINE settlement — a real fixture settled against the on-chain Merkle feed — PASSED
+
+The full real path, no mocks: `tests-devnet/txline-activate.ts` (4-step free World Cup activation) +
+`tests-devnet/txline-settle.ts` (settle against the **real** `Txoracle` devnet
+`6pW64gN1s2uqjHkn1unFeEjAwJkPGHoppGvS715wyP2J`).
+
+- **Activation:** on-chain `subscribe(1, 4)` tx `2hnw1aAkGN4RRqfzRyJiDUEKCq1BnuH9Wm7X6vRet2ozvcZJy1ngU16Fu7NBHoV3rpmKWUdRs1PYgJ2c1C5w778C`,
+  then guest JWT + wallet-signed message + `/api/token/activate` -> live API token. Data pulled from
+  `https://txline-dev.txodds.com/api`.
+- **Fixture 18192996** (real): authenticated score **home 2 - 3 away** via live `stat-validation`
+  Merkle proofs (base keys 1/2). Daily root PDA `CMtVGDyWsZ4u3yeYeyC9yxNzzyvwco6Jgtd9ubRJWCGV`
+  exists on devnet (9232 bytes).
+- **Two-step resolve** (both proofs won't fit one 1232-byte tx):
+  - `attest_home` tx `F3KGfUR9HT3divbERGQT85KDZg2VsTN2DkFmDKMHgpuWbGv9HTwu5uVBxMMrT37EyFP2wPtmvy3CwrbC7abUN1U` — CPI `validate_stat` authenticates home goals against the real on-chain root.
+  - `resolve` tx `2AHVsDyz5atZVLAYfzJeZy795uT3yKj44sugGoL3K4EKMHYLGvx4w6kLFpHDCLztet2oAkJt1GUZRfEY582ewrmA` — authenticates away goals, rulebook resolves.
+- **Result:** receipt outcome **Away** (2 < 3), `reverify() -> true`, winner (Away pool) paid pro-rata.
+  Needs a 1.4M compute-unit budget (Merkle verification is CU-heavy).
+
+Re-run: `bun run txline-activate.ts && bun run txline-settle.ts 18192996 770`.
+
+## Remaining
+Mainnet (real-time L12) run, and a completed-match fixture with a `Completed` status (18192996's feed
+score was authenticated live; for a production market pick a finished fixture + real status code).

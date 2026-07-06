@@ -114,12 +114,11 @@ async function main() {
     stat: { statToProve: { key: statKey, value, period }, eventStatRoot: zero32(), statProof: [] },
   });
 
-  console.log("\n== resolve (Home 2 - 0 Away, Completed) ==");
-  ok("resolve", await program.methods
-    .resolve(witness(homeStatKey, 2), witness(awayStatKey, 0), 0)
-    .accounts({ resolver: deployer.publicKey, market,
-      dailyScoresMerkleRoots: SystemProgram.programId, txoracleProgram: MOCK_TXORACLE })
-    .rpc());
+  console.log("\n== resolve (Home 2 - 0 Away, Completed) — two-step ==");
+  const oracleAccts = { resolver: deployer.publicKey, market,
+    dailyScoresMerkleRoots: SystemProgram.programId, txoracleProgram: MOCK_TXORACLE };
+  ok("attest_home", await program.methods.attestHome(witness(homeStatKey, 2)).accounts(oracleAccts).rpc());
+  ok("resolve", await program.methods.resolve(witness(awayStatKey, 0), 0).accounts(oracleAccts).rpc());
 
   const m = await program.account.market.fetch(market);
   console.log(`  receipt: outcome=${m.receipt.outcomeCode} (0=Home) paidAsRefund=${m.receipt.paidAsRefund} net=${m.receipt.net.toString()} winningPool=${m.receipt.winningPool.toString()}`);

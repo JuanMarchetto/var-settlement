@@ -8,6 +8,56 @@
   },
   "instructions": [
     {
+      "name": "attest_home",
+      "docs": [
+        "Step 1 of resolution (permissionless): authenticate the final HOME goals against Tx LINE's",
+        "on-chain Merkle root (CPI `validate_stat`, `EqualTo` predicate) and cache them. Split from",
+        "`resolve` because both Merkle proofs together exceed the 1232-byte transaction limit."
+      ],
+      "discriminator": [
+        45,
+        157,
+        71,
+        224,
+        6,
+        18,
+        173,
+        127
+      ],
+      "accounts": [
+        {
+          "name": "resolver",
+          "docs": [
+            "Anyone may resolve (permissionless)."
+          ],
+          "signer": true
+        },
+        {
+          "name": "market",
+          "writable": true
+        },
+        {
+          "name": "daily_scores_merkle_roots",
+          "docs": [
+            "The Tx LINE daily scores Merkle roots PDA (seeds [\"daily_scores_roots\", epoch_day u16 LE])."
+          ]
+        },
+        {
+          "name": "txoracle_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "home",
+          "type": {
+            "defined": {
+              "name": "StatWitness"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "claim",
       "docs": [
         "Claim a winning payout or a refund. Idempotent per position (single-claim guard)."
@@ -259,9 +309,8 @@
     {
       "name": "resolve",
       "docs": [
-        "Permissionless resolution. Authenticates the final home & away goals against Tx LINE's",
-        "on-chain Merkle root (CPI `validate_stat` with an `EqualTo` predicate per stat), then runs",
-        "the Kani-proven rulebook and writes a proof-carrying receipt."
+        "Step 2 (permissionless): authenticate the AWAY goals, then run the Kani-proven rulebook on",
+        "the cached home goals + authenticated away goals and write a proof-carrying receipt."
       ],
       "discriminator": [
         246,
@@ -296,14 +345,6 @@
         }
       ],
       "args": [
-        {
-          "name": "home",
-          "type": {
-            "defined": {
-              "name": "StatWitness"
-            }
-          }
-        },
         {
           "name": "away",
           "type": {
@@ -459,26 +500,31 @@
     },
     {
       "code": 6014,
+      "name": "HomeNotAttested",
+      "msg": "Home goals must be attested (attest_home) before resolve"
+    },
+    {
+      "code": 6015,
       "name": "NoReturnData",
       "msg": "Txoracle returned no data"
     },
     {
-      "code": 6015,
+      "code": 6016,
       "name": "InvalidStatus",
       "msg": "Invalid match status code"
     },
     {
-      "code": 6016,
+      "code": 6017,
       "name": "NotSettled",
       "msg": "Market not settled"
     },
     {
-      "code": 6017,
+      "code": 6018,
       "name": "AlreadyClaimed",
       "msg": "Position already claimed"
     },
     {
-      "code": 6018,
+      "code": 6019,
       "name": "NotPositionOwner",
       "msg": "Signer is not the position owner"
     }
@@ -576,6 +622,23 @@
           {
             "name": "pool_away",
             "type": "u64"
+          },
+          {
+            "name": "pending_home_goals",
+            "type": "i32"
+          },
+          {
+            "name": "pending_home_set",
+            "type": "bool"
+          },
+          {
+            "name": "home_events_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           },
           {
             "name": "receipt",

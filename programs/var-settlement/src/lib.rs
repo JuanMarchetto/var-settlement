@@ -32,7 +32,8 @@ pub mod var_settlement {
     /// Create a 1X2 market for one fixture. `home_stat_key`/`away_stat_key`/`period` bind which
     /// authenticated Tx LINE stats count as the regulation home/away goals at resolution.
     pub fn create_market(ctx: Context<CreateMarket>, args: CreateMarketArgs) -> Result<()> {
-        require!(args.market_kind == MARKET_KIND_1X2, VarError::UnsupportedMarketKind);
+        // `market_kind` doubles as a per-fixture nonce (all values are 1X2 markets in V1), so a
+        // fixture can host more than one distinct market account.
         require!(args.fee_bps <= rulebook::MAX_FEE_BPS, VarError::FeeTooHigh);
         require!(args.resolve_deadline > Clock::get()?.unix_timestamp, VarError::DeadlineInPast);
 
@@ -50,6 +51,9 @@ pub mod var_settlement {
         m.pool_home = 0;
         m.pool_draw = 0;
         m.pool_away = 0;
+        m.pending_home_goals = 0;
+        m.pending_home_set = false;
+        m.home_events_root = [0u8; 32];
         m.receipt = ResolutionReceipt::default();
         m.bump = ctx.bumps.market;
         Ok(())
@@ -99,35 +103,48 @@ pub mod var_settlement {
         Ok(())
     }
 
-    /// Permissionless resolution. Authenticates the final home & away goals against Tx LINE's
-    /// on-chain Merkle root (CPI `validate_stat` with an `EqualTo` predicate per stat), then runs
-    /// the Kani-proven rulebook and writes a proof-carrying receipt.
-    pub fn resolve(ctx: Context<Resolve>, home: StatWitness, away: StatWitness, status_code: u8) -> Result<()> {
+    /// Step 1 of resolution (permissionless): authenticate the final HOME goals against Tx LINE's
+    /// on-chain Merkle root (CPI `validate_stat`, `EqualTo` predicate) and cache them. Split from
+    /// `resolve` because both Merkle proofs together exceed the 1232-byte transaction limit.
+    pub fn attest_home(ctx: Context<Resolve>, home: StatWitness) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
         let m = &mut ctx.accounts.market;
         require!(m.status == MarketStatus::Open as u8, VarError::AlreadySettled);
         require!(now <= m.resolve_deadline.saturating_add(RESOLVE_GRACE_SECS), VarError::ResolveWindowPassed);
-
-        // Bind each witness to THIS market's fixture (prevents resolving with a valid proof from a
-        // different match that happens to share stat keys) and to the configured stat key + period.
         require!(home.summary.fixture_id == m.fixture_id, VarError::FixtureMismatch);
-        require!(away.summary.fixture_id == m.fixture_id, VarError::FixtureMismatch);
         require!(home.stat.stat_to_prove.key == m.home_stat_key, VarError::StatKeyMismatch);
-        require!(away.stat.stat_to_prove.key == m.away_stat_key, VarError::StatKeyMismatch);
         require!(home.stat.stat_to_prove.period == m.period, VarError::StatPeriodMismatch);
-        require!(away.stat.stat_to_prove.period == m.period, VarError::StatPeriodMismatch);
 
-        // Authenticate against the on-chain daily root. `validate_stat` proves the stat is in the
-        // Merkle tree AND satisfies the predicate; EqualTo(threshold = claimed value) => authentic value.
         let home_goals = home.stat.stat_to_prove.value;
-        let away_goals = away.stat.stat_to_prove.value;
-        let ok_home = txoracle_cpi::validate_stat_equal(
+        let ok = txoracle_cpi::validate_stat_equal(
             &ctx.accounts.txoracle_program,
             &ctx.accounts.daily_scores_merkle_roots,
             &home,
             home_goals,
         )?;
-        require!(ok_home, VarError::StatNotAuthenticated);
+        require!(ok, VarError::StatNotAuthenticated);
+
+        m.pending_home_goals = home_goals;
+        m.pending_home_set = true;
+        m.home_events_root = home.summary.events_sub_tree_root;
+        Ok(())
+    }
+
+    /// Step 2 (permissionless): authenticate the AWAY goals, then run the Kani-proven rulebook on
+    /// the cached home goals + authenticated away goals and write a proof-carrying receipt.
+    pub fn resolve(ctx: Context<Resolve>, away: StatWitness, status_code: u8) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let m = &mut ctx.accounts.market;
+        require!(m.status == MarketStatus::Open as u8, VarError::AlreadySettled);
+        require!(m.pending_home_set, VarError::HomeNotAttested);
+        require!(now <= m.resolve_deadline.saturating_add(RESOLVE_GRACE_SECS), VarError::ResolveWindowPassed);
+
+        // Bind the away witness to THIS market's fixture + configured stat key/period.
+        require!(away.summary.fixture_id == m.fixture_id, VarError::FixtureMismatch);
+        require!(away.stat.stat_to_prove.key == m.away_stat_key, VarError::StatKeyMismatch);
+        require!(away.stat.stat_to_prove.period == m.period, VarError::StatPeriodMismatch);
+
+        let away_goals = away.stat.stat_to_prove.value;
         let ok_away = txoracle_cpi::validate_stat_equal(
             &ctx.accounts.txoracle_program,
             &ctx.accounts.daily_scores_merkle_roots,
@@ -137,13 +154,14 @@ pub mod var_settlement {
         require!(ok_away, VarError::StatNotAuthenticated);
 
         // Run the formally-verified rulebook on the authenticated facts.
+        let home_goals = m.pending_home_goals;
         let status = decode_status(status_code)?;
         let pools = Pools::new(m.pool_home, m.pool_draw, m.pool_away);
         let r = rulebook_resolve(&MatchState::new(home_goals, away_goals, status), pools, m.fee_bps);
 
-        // Provenance: bind the receipt to the authenticated sub-tree roots and the ruleset.
+        // Provenance: bind the receipt to both authenticated sub-tree roots and the ruleset.
         let source_root = hashv(&[
-            home.summary.events_sub_tree_root.as_slice(),
+            m.home_events_root.as_slice(),
             away.summary.events_sub_tree_root.as_slice(),
         ])
         .to_bytes();
@@ -439,13 +457,19 @@ pub struct Market {
     pub pool_home: u64,
     pub pool_draw: u64,
     pub pool_away: u64,
+    // Two-step resolution: home goals are authenticated first (attest_home) and cached here, because
+    // both Merkle proofs together exceed the 1232-byte transaction limit.
+    pub pending_home_goals: i32,
+    pub pending_home_set: bool,
+    pub home_events_root: [u8; 32],
     pub receipt: ResolutionReceipt,
     pub bump: u8,
 }
 
 impl Market {
-    // discriminator(8) + fixed fields + receipt
-    pub const SPACE: usize = 8 + 8 + 1 + 4 + 4 + 4 + 2 + 8 + 1 + 32 + 32 + 8 + 8 + 8 + ResolutionReceipt::SPACE + 1;
+    // discriminator(8) + fixed fields + pending-home cache + receipt
+    pub const SPACE: usize =
+        8 + 8 + 1 + 4 + 4 + 4 + 2 + 8 + 1 + 32 + 32 + 8 + 8 + 8 + (4 + 1 + 32) + ResolutionReceipt::SPACE + 1;
 }
 impl ResolutionReceipt {
     pub const SPACE: usize = 32 + 32 + 4 + 4 + 1 + 1 + 1 + 8 + 8 + 8 + 8 + 8;
@@ -613,6 +637,8 @@ pub enum VarError {
     StatPeriodMismatch,
     #[msg("Stat failed on-chain authentication")]
     StatNotAuthenticated,
+    #[msg("Home goals must be attested (attest_home) before resolve")]
+    HomeNotAttested,
     #[msg("Txoracle returned no data")]
     NoReturnData,
     #[msg("Invalid match status code")]
