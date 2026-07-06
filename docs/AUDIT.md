@@ -158,10 +158,14 @@ In priority order:
    early/late resolve boundary, and the refund path against real account state, or just re-test the
    rulebook math a second time?
 
-**Follow-up flagged during this audit:** `resolve()` checks `home.stat.stat_to_prove.key ==
-m.home_stat_key` and the equivalent for away/period, but does not explicitly assert
-`home.summary.fixture_id == away.summary.fixture_id == m.fixture_id`. In practice a caller would
-have to supply a same-fixture pair of valid witnesses to get both CPIs to pass in the first place
-(since the stat keys are fixture-scoped upstream), but the program itself doesn't check `fixture_id`
-directly. This should be tightened before mainnet — added here explicitly so it isn't lost before
-the `litesvm` suite gets written.
+**Resolved during this audit:** each witness is now bound on-chain to the market's own
+`fixture_id` — `attest_home` asserts `home.summary.fixture_id == m.fixture_id` and `resolve`
+asserts `away.summary.fixture_id == m.fixture_id` (both `VarError::FixtureMismatch`), in addition
+to the stat-key and period checks. Because both are compared against `m.fixture_id`, a cross-fixture
+home/away pair is transitively rejected. A valid Merkle proof lifted from a different match that
+shares stat keys can no longer be used to settle this market.
+
+**Remaining open item:** the match-status code is a resolver input, not an oracle-authenticated
+field. The proven rulebook fail-closes every non-`Completed` status to `Refund` (INV-1), bounding
+the downside to a refund, but binding status to an authenticated feed field is the gap to close
+before mainnet.
