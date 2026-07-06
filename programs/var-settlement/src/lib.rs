@@ -108,7 +108,10 @@ pub mod var_settlement {
         require!(m.status == MarketStatus::Open as u8, VarError::AlreadySettled);
         require!(now <= m.resolve_deadline.saturating_add(RESOLVE_GRACE_SECS), VarError::ResolveWindowPassed);
 
-        // Bind each witness to the market's configured stat key + period (prevents cross-stat spoofing).
+        // Bind each witness to THIS market's fixture (prevents resolving with a valid proof from a
+        // different match that happens to share stat keys) and to the configured stat key + period.
+        require!(home.summary.fixture_id == m.fixture_id, VarError::FixtureMismatch);
+        require!(away.summary.fixture_id == m.fixture_id, VarError::FixtureMismatch);
         require!(home.stat.stat_to_prove.key == m.home_stat_key, VarError::StatKeyMismatch);
         require!(away.stat.stat_to_prove.key == m.away_stat_key, VarError::StatKeyMismatch);
         require!(home.stat.stat_to_prove.period == m.period, VarError::StatPeriodMismatch);
@@ -602,6 +605,8 @@ pub enum VarError {
     AlreadySettled,
     #[msg("Resolve window has passed")]
     ResolveWindowPassed,
+    #[msg("Witness fixture does not match this market")]
+    FixtureMismatch,
     #[msg("Stat key does not match market configuration")]
     StatKeyMismatch,
     #[msg("Stat period does not match market configuration")]

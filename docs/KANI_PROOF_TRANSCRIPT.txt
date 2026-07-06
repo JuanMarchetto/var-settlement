@@ -1,0 +1,13 @@
+Checking harness proofs::inv3_settle_fail_closed...
+ ** 0 of 60 failed (3 unreachable)
+VERIFICATION:- SUCCESSFUL
+Checking harness proofs::inv2_settlement_conserves...
+ ** 0 of 68 failed
+VERIFICATION:- SUCCESSFUL
+Checking harness proofs::inv4_resolve_outcome_deterministic...
+ ** 0 of 58 failed
+VERIFICATION:- SUCCESSFUL
+Checking harness proofs::inv1_resolve_outcome_total_and_correct...
+ ** 0 of 64 failed
+VERIFICATION:- SUCCESSFUL
+Complete - 4 successfully verified harnesses, 0 failures, 4 total.

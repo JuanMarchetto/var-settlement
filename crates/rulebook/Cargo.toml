@@ -12,6 +12,7 @@ license = "MIT"
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+proptest = "1"
 
 [lints.rust]
 # `kani` cfg is set only by `cargo kani`; declare it so normal builds don't warn.

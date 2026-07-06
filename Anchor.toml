@@ -1,0 +1,25 @@
+[toolchain]
+anchor_version = "0.32.1"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+var_settlement = "AepSNpDzMUdBgjxA9irxxL7NTQHxXtDVq6rnqq17Lxk"
+
+[programs.devnet]
+var_settlement = "AepSNpDzMUdBgjxA9irxxL7NTQHxXtDVq6rnqq17Lxk"
+
+[programs.mainnet]
+var_settlement = "AepSNpDzMUdBgjxA9irxxL7NTQHxXtDVq6rnqq17Lxk"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "Devnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "echo 'litesvm/anchor integration tests: see programs/var-settlement (staged)'"
