@@ -98,7 +98,7 @@ async function main() {
   }).accounts({ creator: deployer.publicKey, market, usdcMint: usdc, vault, tokenProgram: TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId, rent: SYSVAR_RENT_PUBKEY }).rpc();
   await program.methods.deposit(0, new BN(40 * U)).accounts({ depositor: A.publicKey, market, vault, depositorAta: ataA, position: posA, tokenProgram: TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId }).signers([A]).rpc();
   await program.methods.deposit(2, new BN(60 * U)).accounts({ depositor: B.publicKey, market, vault, depositorAta: ataB, position: posB, tokenProgram: TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId }).signers([B]).rpc();
-  console.log("  market created; A->Home 40, B->Away 60");
+  console.log(`  market created: ${market.toBase58()}  (A->Home 40, B->Away 60)`);
 
   console.log("\n== RESOLVE against the REAL Txoracle (two-step CPI validate_stat) ==");
   const oracleAccts = { resolver: deployer.publicKey, market, dailyScoresMerkleRoots: dailyPda, txoracleProgram: TXORACLE_REAL };

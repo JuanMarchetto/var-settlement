@@ -47,13 +47,18 @@ The full real path, no mocks: `tests-devnet/txline-activate.ts` (4-step free Wor
 - **Fixture 18192996** (real): authenticated score **home 2 - 3 away** via live `stat-validation`
   Merkle proofs (base keys 1/2). Daily root PDA `CMtVGDyWsZ4u3yeYeyC9yxNzzyvwco6Jgtd9ubRJWCGV`
   exists on devnet (9232 bytes).
+- **Market PDA** (this settlement): `A81iUQpYd5HuQvkyvpB8YjpvMQwVP8L7xuwak3a9TNYL`.
 - **Two-step resolve** (both proofs won't fit one 1232-byte tx):
-  - `attest_home` tx `F3KGfUR9HT3divbERGQT85KDZg2VsTN2DkFmDKMHgpuWbGv9HTwu5uVBxMMrT37EyFP2wPtmvy3CwrbC7abUN1U` — CPI `validate_stat` authenticates home goals against the real on-chain root.
-  - `resolve` tx `2AHVsDyz5atZVLAYfzJeZy795uT3yKj44sugGoL3K4EKMHYLGvx4w6kLFpHDCLztet2oAkJt1GUZRfEY582ewrmA` — authenticates away goals, rulebook resolves.
-- **Result:** receipt outcome **Away** (2 < 3), `reverify() -> true`, winner (Away pool) paid pro-rata.
-  Needs a 1.4M compute-unit budget (Merkle verification is CU-heavy).
+  - `attest_home` tx `53dkuaseF6pAD71WDAaPUzwEQFQ6keWgRuafVM8DBqyvBZqWMwQg3GAtzbuJP5fSFYJ1rxpDKbE7HMK1AXtfbsws` — CPI `validate_stat` authenticates home goals against the real on-chain root.
+  - `resolve` tx `4j2ukzmW8rJNMAuCiyyKaiqksviB6mZS26e4FSfFuhBynV5mQXv8DMasLJUopv3XUC4BsFHQxPNPLPoj69oVtnyC` — authenticates away goals, rulebook resolves.
+- **Result:** receipt outcome **Away** (2 < 3), winner (Away pool) paid pro-rata. Needs a 1.4M
+  compute-unit budget (Merkle verification is CU-heavy).
+- **Permissionless `reverify` (the trust proof):** a stranger wallet `WQMF7mLsD4CJ5UKCGHJFCMCdjce593xtjSnRi78gmv1`
+  that never created, funded, or resolved this market re-derives the outcome via `reverify().view()`
+  and gets `true` (`tests-devnet/reverify.ts A81iUQpYd5HuQvkyvpB8YjpvMQwVP8L7xuwak3a9TNYL`).
 
-Re-run: `bun run txline-activate.ts && bun run txline-settle.ts 18192996 770`.
+Re-run: `bun run txline-activate.ts && bun run txline-settle.ts 18192996 770`, then
+`bun run reverify.ts <market-from-the-settle-output>`.
 
 ## Remaining
 Mainnet (real-time L12) run, and a completed-match fixture with a `Completed` status (18192996's feed

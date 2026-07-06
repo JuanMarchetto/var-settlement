@@ -1,144 +1,107 @@
-# Demo video script — 3:00
+# VAR — 3-Minute Demo Video Script (Recordable)
 
-Shot list for the Superteam World Cup Hackathon submission video. Timings are targets, not
-straitjackets — cut for pace, but hit every beat listed. Screen recording + voiceover; no editing
-tricks that misrepresent what's actually running (see `README.md` Current Status for what's real
-today versus what's still staged — the video should reflect that honestly, same as the docs).
+**Project:** VAR — Verifiable Automated Resolution
+**Event:** Superteam World Cup Hackathon — Track 1: Prediction Markets & Settlement ($18,000)
+**Repo:** https://github.com/JuanMarchetto/var-settlement
+**Runtime target:** ~180 s. Screen recording + voiceover. Everything shown is real and on devnet.
 
-Not yet recorded. This is the shooting plan.
-
----
-
-## 0:00–0:25 — Hook: the dispute problem
-
-**Visual:** Cold open on a headline/screenshot-style card: the 2026 Polymarket/UMA dispute — a
-$60M+ market resolved against a filed 8-K, by token vote.
-
-**Voiceover:**
-"Earlier this year a $60 million prediction market got resolved the wrong way — against a filed
-SEC document — because the people holding the most dispute tokens voted that way. That's not an
-edge case. That's the resolution model working exactly as designed, and the design is broken.
-The other failure mode is just as common: a closed oracle pipe where you're told to trust that the
-right number got pushed on-chain, with no way to check it yourself.
-
-This is VAR — Verifiable Automated Resolution. It settles World Cup markets with no token vote, no
-dispute bond, no arbiter. Just a proof, that anyone can re-run."
-
-**On screen:** Title card — "VAR: Verifiable Automated Resolution" / "Superteam World Cup Hackathon
-— Track 1."
+**Honesty rule (state it in the description, honor it on screen):** no edit removes, reorders, or fabricates real terminal output. Time-compression is allowed but **labeled** — a `cargo kani` bounded model-check is minutes, and two 1.4M-CU resolve transactions plus live API round-trips are not 30-second events, so any sped-up or pre-captured segment carries a caption (`2×, unedited` or `real run — tx signatures on-chain`). The one genuinely live, real-time keystroke on camera is the permissionless `reverify` from a stranger wallet.
 
 ---
 
-## 0:25–0:55 — Create + deposit
+## Recording setup (read first)
 
-**Visual:** Terminal or CLI session. Show `create_market` being called for a real fixture (use a
-2026 group-stage fixture ID, or a scenario from `scenarios/` for narrative continuity — e.g.
-Argentina vs Mexico). Then two `deposit` calls into different outcome buckets (Home / Draw / Away)
-from two different wallets, USDC amounts visible.
-
-**Voiceover:**
-"A market is just three USDC pools — Home, Draw, Away — tied to one fixture. Anyone can create one,
-anyone can deposit. No order book, no market maker. Stake USDC on the outcome you think is right,
-and wait for the match."
-
-**On screen callouts:** `Market` PDA address, pool totals updating live (`pool_home`, `pool_draw`,
-`pool_away`), the `Position` PDA being created for each depositor.
-
----
-
-## 0:55–1:50 — The resolve-with-real-proof moment (centerpiece #1)
-
-**Visual:** The match has "ended" (use a real historical scoreline for the demo fixture). Call
-`resolve()` on-screen. Walk through what's actually happening, ideally with a side panel or overlay
-showing the CPI:
-
-1. The claimed scoreline (`home_goals`, `away_goals`) going in.
-2. The CPI to `Txoracle::validate_stat` firing — twice, once per side — with
-   `comparison = EqualTo, threshold = claimed goals`.
-3. Both calls returning `true` against the on-chain `daily_scores_merkle_roots` PDA.
-4. The Kani-proven `rulebook::resolve()` running on the now-authenticated `MatchState` and pool
-   totals, producing an `Outcome` and a `Settlement`.
-5. The `ResolutionReceipt` getting written on-chain — `source_root`, `ruleset_hash`, scoreline,
-   outcome, payout split.
-
-**Voiceover:**
-"Here's the moment that matters. `resolve` doesn't take anyone's word for the score. It calls into
-Tx LINE's on-chain oracle, twice, once per side, and asks it to prove the exact scoreline against
-its Merkle-committed daily root. Only if both come back true does the program even look at the
-result. Then — and only then — a formally verified rulebook, proven with Kani, maps the fact
-pattern to an outcome and a payout split. That receipt gets written on-chain. Nobody signed off on
-it. Nobody voted on it. It's just proof."
-
-**On screen:** Highlight the two `validate_stat` CPI calls and the `true`/`true` return values, then
-the `ResolutionReceipt` fields populating.
+- **Terminal:** dark theme, font **18–20 pt**, ~110–120 columns, generous line height. One prompt visible, scrollback clean.
+- **Three panes to pre-open:**
+  - **Tab A — Proofs:** `cd /home/marche/var-settlement/crates/rulebook` (runs `cargo kani`, then `cargo test`).
+  - **Tab B — Live settlement:** `cd /home/marche/var-settlement/tests-devnet` (the real Tx LINE settle — **pre-warmed**, see below).
+  - **Tab C — Permissionless reverify:** `cd /home/marche/var-settlement/tests-devnet` (the stranger-wallet `reverify`, run **live** on camera).
+  - **Browser:** Solana Explorer, resolve-tx URL preloaded but not yet revealed (see Assets).
+- **Pre-warm before rolling (these are slow and the live API token is short-lived):**
+  1. **Kani:** run `cargo kani` once so results are cached; on camera re-run it and let the cached `Complete - 4 …` line land, or speed-ramp the live run and label it `2×, unedited`.
+  2. **Tx LINE settle:** run `bun run txline-activate.ts` (fresh live token), then `bun run txline-settle.ts 18192996 770` **before** recording. Tab B on screen is that real run's captured output (caption: `real run — tx signatures on-chain`). The canonical settled market it produces is already on devnet: market PDA `A81iUQpYd5HuQvkyvpB8YjpvMQwVP8L7xuwak3a9TNYL`, resolve tx `4j2u…` — the video anchors every Explorer link and the reverify to **that** market so everything a judge clicks is consistent.
+  3. **Stranger wallet (required for the live reverify):** create a keypair that never touches the market and **fund it minimally** — `solana-keygen new -o ~/.config/solana/stranger.json --no-bip39-passphrase` then `solana airdrop 0.02 ~/.config/solana/stranger.json -u devnet`. `reverify` is a read-only `.view()`, but Solana still simulates against a fee-payer that must **exist on-chain** — an unfunded stranger returns `AccountNotFound`, not `true`. The 0.02 SOL only makes the wallet exist; it never touches the market, so "never touched this market" holds. (Verified: unfunded → `AccountNotFound`; funded → `reverify (stranger wallet) -> true`.)
+- **Caption `770`** the first time it appears: *"770 = Tx LINE feed sequence #"* — it's the feed's update index for the fixture, needed to fetch the right stat-validation snapshot.
+- **Pace:** ~2–2.5 words/sec. Let the `cargo kani` tally, the two tx signatures, and the stranger `reverify -> true` sit on screen — the pauses are the proof.
 
 ---
 
-## 1:50–2:25 — The permissionless reverify "green check" climax (centerpiece #2)
+## Timecode table (0:00 – 3:00)
 
-**Visual:** A *different* wallet — one that had nothing to do with creating the market, depositing,
-or resolving it — calls `reverify()`. Show the call, and the boolean result coming back `true`, big
-and unmissable on screen (green checkmark overlay).
-
-**Voiceover:**
-"Now watch this. Anyone — this wallet has never touched this market before — can call `reverify`.
-It re-runs the exact same rulebook function, from scratch, against the receipt that's already on
-chain. Not a re-check of a signature. A full re-derivation of the outcome and the payout math. If
-even one bit doesn't match, this comes back false. It doesn't."
-
-**On screen:** The `reverify()` return value: `true`, rendered as a large green check. Optionally
-show the Solana Explorer transaction link so a viewer can click through and verify it themselves
-after the video.
+| Time | On screen | Voiceover (exact narration) | Terminal command / action |
+|---|---|---|---|
+| **0:00–0:10** | Problem card. At **~0:08** it swaps to: **"VAR — settlement anyone can re-run."** | "This year, a reported sixty-million-dollar prediction market resolved against a filed SEC document — because the biggest token holders voted that way. That's the model working as designed." | Static card. No terminal yet. |
+| **0:10–0:22** | Title card: **"VAR — Verifiable Automated Resolution"** / "World Cup 1X2 settlement on Solana. No token vote. No dispute bond. No arbiter." | "This is VAR — Verifiable Automated Resolution. World Cup match settlement with no token vote, no dispute bond, no arbiter — just a proof anyone can re-run." | Cut to **Tab A**, prompt ready. |
+| **0:22–0:48** | `cargo kani` running, then the summary: **"Complete - 4 successfully verified harnesses, 0 failures, 4 total."** (Caption if sped up: `2×, unedited`.) | "The core is a pure Rust rulebook — not just tested, formally proven. Four Kani harnesses, exhaustively model-checked, not sampled: totality and fail-closed, value conservation, settlement fail-closed, and determinism. This proves the rulebook cannot mint money, cannot panic, and cannot give two different answers for the same match." | Type `cargo kani`. Let the four `VERIFICATION:- SUCCESSFUL` lines and the `Complete - 4 … 4 total.` tally land. |
+| **0:48–1:05** | `cargo test` scrolling to `test result: ok`. Briefly highlight `06_penalties-draw-argentina-france-final`. | "Underneath it: twelve real World Cup vectors — including the 2022 final, two-two, decided on penalties, which settles Draw on the ninety-minute result — plus twelve thousand property-tested payout cases. All green." | Type `cargo test -p rulebook`. Let `test result: ok` show. |
+| **1:05–1:30** | **Tab B** (real run, captioned `real run — tx signatures on-chain`). Output shows `== fetch REAL proofs for fixture 18192996 seq 770 ==` and `authenticated score: home 2 - 3 away`. Caption `770 = Tx LINE feed sequence #`. | "Now the real thing, no mock. This settles a real fixture against Tx LINE's live on-chain feed. The SDK pulls the final goal counts and a Merkle proof for each side, then hands the claimed score to the program — home two, away three." | Reveal Tab B: the captured `bun run txline-settle.ts 18192996 770`. Let the authenticated scoreline land. |
+| **1:30–2:00** | `attest_home tx: 53dk…` then `resolve tx: 4j2u…`, then `receipt: outcome=Away paidAsRefund=false …`, then `REAL SETTLEMENT PASSED  (resolve tx: 4j2u…)`. Callout: real Txoracle `6pW64gN1…wyP2J`, ~1.4M CU. | "resolve doesn't take my word for the score. It CPIs into the real Tx LINE oracle and proves each goal count against its Merkle-committed daily root — home goals in attest_home, away goals in resolve. Two transactions, because both proofs won't fit one. Match status is a separate input the Kani-proven rulebook fail-closes: anything but a completed result refunds everyone. Two proven against three — outcome Away. Nobody signed it. Nobody voted." | Let both signatures and the `REAL SETTLEMENT PASSED` line print. |
+| **2:00–2:28** | **Tab C — LIVE.** Prints `stranger wallet: WQMF…` then, big: **`== reverify (stranger wallet) -> true ==`**. Optional green-check overlay. | "Here's what makes it trustless. This is a fresh wallet that never created, funded, or resolved this market. It calls reverify — a read-only view, no signer, no fee — and re-derives the entire outcome and payout from scratch against the on-chain receipt. One bit off and it returns false. It returns true." | Type live: `bun run reverify.ts A81iUQpYd5HuQvkyvpB8YjpvMQwVP8L7xuwak3a9TNYL`. Hold on `-> true` for 2 s. |
+| **2:28–2:45** | Cut to **browser**: Solana Explorer, the **`resolve` tx** page (devnet), instruction list showing the CPI into Txoracle and the compute budget; then flash the market/program page. | "And you don't have to take my word for any of it. Here's that resolve transaction on Solana Explorer — the CPI into the real Txoracle, on a program live on devnet right now. Open it. Re-run it yourself." | Reveal preloaded Explorer (resolve tx `4j2u…`). Scroll to the inner CPI instruction. |
+| **2:45–3:00** | End card: repo URL + `cargo kani && cargo test -p rulebook` + "No token vote. No dispute. No arbiter." + "Track 1 submission." | "Formally proven, permissionlessly re-verifiable, settled straight off the oracle's own Merkle root — no token vote, no dispute bond, no arbiter can override it. Clone the repo. Run the proofs. That's VAR." | Static end card. Fade. |
 
 ---
 
-## 2:25–2:45 — Edge case: penalties → Draw, and abandonment → refund
+## Assets to have on screen (copy-paste ready)
 
-**Visual:** Quick cut to two scenario vectors from `scenarios/` running through `cargo test -p
-rulebook`, or shown as a side-by-side table:
-- `06_penalties-draw-argentina-france-final.json` — 2022 WC Final, 2-2 in regulation, decided 4-2 on
-  penalties. Market settles **Draw** — it's a 1X2 match-result market, priced on the 90' scoreline,
-  same convention as a sportsbook match-result line.
-- `08_abandoned-match-refund.json` — a match abandoned mid-second-half. No valid regulation result
-  exists, so the rulebook fails closed to **Refund** — every depositor gets their exact stake back,
-  no fee taken.
+**Commands (exact):**
+```bash
+# Tab A (cd crates/rulebook)
+cargo kani            # -> "Complete - 4 successfully verified harnesses, 0 failures, 4 total."
+cargo test -p rulebook
 
-**Voiceover:**
-"Two edge cases that matter more than the happy path. A penalty shootout doesn't change the
-match-result bet — it settles Draw, same as any sportsbook 1X2 line, because the market prices the
-90 minutes. And if a match gets abandoned, there's no result to settle on, so the rulebook doesn't
-guess — it refunds everyone, exactly their stake, no fee. Every degenerate case in this system fails
-closed, never confidently wrong."
+# Tab B (cd tests-devnet) — pre-warm BEFORE recording (token is short-lived)
+bun run txline-activate.ts
+bun run txline-settle.ts 18192996 770     # 770 = Tx LINE feed sequence #
 
-**On screen:** Show both scenario JSON files and their `expected_outcome` fields matching the actual
-`cargo test` output.
+# Tab C (cd tests-devnet) — run LIVE on camera, from the funded stranger wallet
+bun run reverify.ts A81iUQpYd5HuQvkyvpB8YjpvMQwVP8L7xuwak3a9TNYL
+```
+
+**On-chain addresses:**
+- var_settlement program (devnet): `AepSNpDzMUdBgjxA9irxxL7NTQHxXtDVq6rnqq17Lxk`
+- Real Txoracle / Tx LINE (devnet): `6pW64gN1s2uqjHkn1unFeEjAwJkPGHoppGvS715wyP2J`
+- Canonical settled **market PDA** (fixture 18192996 — what `reverify` targets): `A81iUQpYd5HuQvkyvpB8YjpvMQwVP8L7xuwak3a9TNYL`
+- Daily-scores-roots PDA (fixture's day): `CMtVGDyWsZ4u3yeYeyC9yxNzzyvwco6Jgtd9ubRJWCGV`
+- Stranger wallet (fund with 0.02 SOL, never touches the market): `WQMF7mLsD4CJ5UKCGHJFCMCdjce593xtjSnRi78gmv1`
+
+**Transactions to show (Explorer, `?cluster=devnet`):**
+- `attest_home` (home goals authenticated): `53dkuaseF6pAD71WDAaPUzwEQFQ6keWgRuafVM8DBqyvBZqWMwQg3GAtzbuJP5fSFYJ1rxpDKbE7HMK1AXtfbsws`
+  https://explorer.solana.com/tx/53dkuaseF6pAD71WDAaPUzwEQFQ6keWgRuafVM8DBqyvBZqWMwQg3GAtzbuJP5fSFYJ1rxpDKbE7HMK1AXtfbsws?cluster=devnet
+- `resolve` (MONEY SHOT — away goals authenticated, rulebook resolves):
+  `4j2ukzmW8rJNMAuCiyyKaiqksviB6mZS26e4FSfFuhBynV5mQXv8DMasLJUopv3XUC4BsFHQxPNPLPoj69oVtnyC`
+  https://explorer.solana.com/tx/4j2ukzmW8rJNMAuCiyyKaiqksviB6mZS26e4FSfFuhBynV5mQXv8DMasLJUopv3XUC4BsFHQxPNPLPoj69oVtnyC?cluster=devnet
+- Program page: https://explorer.solana.com/address/AepSNpDzMUdBgjxA9irxxL7NTQHxXtDVq6rnqq17Lxk?cluster=devnet
+- Market page (the one `reverify` re-derives): https://explorer.solana.com/address/A81iUQpYd5HuQvkyvpB8YjpvMQwVP8L7xuwak3a9TNYL?cluster=devnet
+
+**`reverify.ts` (already in `tests-devnet/`, source shown for self-containment):**
+```ts
+// bun run reverify.ts <marketPubkey>  — read-only .view() from a stranger wallet (no signer, no fee)
+import * as anchor from "@coral-xyz/anchor";
+import { Connection, Keypair, PublicKey } from "@solana/web3.js";
+import { readFileSync } from "fs";
+
+const RPC = "https://api.devnet.solana.com";
+const market = new PublicKey(process.argv[2] || "A81iUQpYd5HuQvkyvpB8YjpvMQwVP8L7xuwak3a9TNYL");
+const stranger = Keypair.fromSecretKey(
+  Uint8Array.from(JSON.parse(readFileSync(`${process.env.HOME}/.config/solana/stranger.json`, "utf8"))));
+const conn = new Connection(RPC, "confirmed");
+const provider = new anchor.AnchorProvider(conn, new anchor.Wallet(stranger), { commitment: "confirmed" });
+anchor.setProvider(provider);
+const idl = JSON.parse(readFileSync(new URL("../idl/var_settlement.json", import.meta.url), "utf8"));
+const program = new anchor.Program(idl, provider);
+console.log(`stranger wallet: ${stranger.publicKey.toBase58()} (never touched market ${market.toBase58()})`);
+const verified = await program.methods.reverify().accounts({ market }).view();
+console.log(`\n== reverify (stranger wallet) -> ${verified} ==`);
+process.exit(verified === true ? 0 : 1);
+```
+
+**Facts to keep straight on camera:** fixture `18192996`, feed sequence `770`, authenticated **goal counts** home `2` – away `3` (match **status is a caller-supplied input** the rulebook fail-closes — do not imply status is oracle-proven), outcome **Away**, `reverify -> true`, real Txoracle `6pW64gN1…wyP2J`, `resolve` needs a **1.4M compute-unit** budget (Merkle verification is CU-heavy).
 
 ---
 
-## 2:45–3:00 — The `cargo kani` PASS shot
+## Fallback (only if the live Tx LINE token/feed is flaky at shoot time)
 
-**Visual:** Terminal, `cargo kani -p rulebook` running to completion, all five proof harnesses
-(`inv1_resolve_outcome_total_and_correct`, `inv2_settlement_conserves`,
-`inv2b_two_winner_split_within_net`, `inv3_settle_fail_closed`, `inv4_resolve_deterministic`)
-showing `SUCCESSFUL`/`VERIFICATION:- SUCCESSFUL`.
-
-**Voiceover:**
-"And the whole thing underneath is formally proven, not just tested. Five Kani harnesses,
-exhaustively checked, not sampled: totality, conservation, fail-closed behavior, determinism. This
-isn't 'we wrote tests and they passed.' It's 'we proved the rulebook cannot mint money, cannot
-panic, and cannot produce two different answers for the same match.' Clone the repo. Run it
-yourself. VAR — Verifiable Automated Resolution."
-
-**On screen:** End card — repo URL, "cargo test -p rulebook && cargo kani -p rulebook," Track 1
-submission mark.
-
----
-
-## Descope floor backstop (only if live mainnet isn't ready by shoot day)
-
-If the live Tx LINE mainnet activation or a real settled mainnet market isn't ready when this gets
-recorded, shoot the **devnet L1 (60s-delayed) path plus an explicitly-labeled simulated replay** of
-a real match's score sequence instead (per `spec.md` §1 descope floor). Say so on screen — a caption
-reading "devnet + simulated feed replay, see spec.md for the mainnet activation plan" — rather than
-implying a live mainnet run that didn't happen. The non-negotiable floor either way: the Kani-proven
-rulebook, the on-chain resolve/claim/reverify path, and one real settled market, shown end to end.
+- **Line 1 — mock end-to-end:** run `cd tests-devnet && bun run smoke.ts` — full `create → deposit → resolve (Home 2–0, CPI validate_stat) → reverify → claim`, final balances **158 / 40 / 2** (the 2% fee), outcome Home. Caption on screen: *"mock Txoracle stand-in — real Tx LINE run in DEPLOYMENTS.md."*
+- **Line 2 — pre-recorded real run:** splice the captured `bun run txline-settle.ts 18192996 770` (label it *"pre-recorded, tx signatures on-chain — see DEPLOYMENTS.md"*). The non-negotiable floor is: the Kani `4 total` line, one real settled market, and the live stranger-wallet `reverify (stranger wallet) -> true`.
+- **Stranger `reverify` is the safest live moment even if the feed is down** — it re-derives the already-settled market `A81iUQpYd5HuQvkyvpB8YjpvMQwVP8L7xuwak3a9TNYL` from an on-chain receipt, independent of Tx LINE availability. Keep it in every cut.
