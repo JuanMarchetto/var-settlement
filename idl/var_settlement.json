@@ -1,0 +1,903 @@
+{
+  "address": "AepSNpDzMUdBgjxA9irxxL7NTQHxXtDVq6rnqq17Lxk",
+  "metadata": {
+    "name": "var_settlement",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "VAR — trustless, Kani-proven settlement for World Cup 1X2 markets, resolving from Tx LINE's on-chain Merkle feed."
+  },
+  "instructions": [
+    {
+      "name": "claim",
+      "docs": [
+        "Claim a winning payout or a refund. Idempotent per position (single-claim guard)."
+      ],
+      "discriminator": [
+        62,
+        198,
+        214,
+        193,
+        213,
+        159,
+        108,
+        210
+      ],
+      "accounts": [
+        {
+          "name": "claimant",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "market",
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "claimant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "recipient_ata",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_market",
+      "docs": [
+        "Create a 1X2 market for one fixture. `home_stat_key`/`away_stat_key`/`period` bind which",
+        "authenticated Tx LINE stats count as the regulation home/away goals at resolution."
+      ],
+      "discriminator": [
+        103,
+        226,
+        97,
+        235,
+        200,
+        188,
+        251,
+        254
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "market",
+          "writable": true
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "CreateMarketArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "deposit",
+      "docs": [
+        "Stake USDC on one outcome. Escrows into the market vault and records the position."
+      ],
+      "discriminator": [
+        242,
+        35,
+        198,
+        137,
+        82,
+        225,
+        242,
+        182
+      ],
+      "accounts": [
+        {
+          "name": "depositor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "market",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "depositor_ata",
+          "writable": true
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "depositor"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "outcome",
+          "type": "u8"
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "resolve",
+      "docs": [
+        "Permissionless resolution. Authenticates the final home & away goals against Tx LINE's",
+        "on-chain Merkle root (CPI `validate_stat` with an `EqualTo` predicate per stat), then runs",
+        "the Kani-proven rulebook and writes a proof-carrying receipt."
+      ],
+      "discriminator": [
+        246,
+        150,
+        236,
+        206,
+        108,
+        63,
+        58,
+        10
+      ],
+      "accounts": [
+        {
+          "name": "resolver",
+          "docs": [
+            "Anyone may resolve (permissionless)."
+          ],
+          "signer": true
+        },
+        {
+          "name": "market",
+          "writable": true
+        },
+        {
+          "name": "daily_scores_merkle_roots",
+          "docs": [
+            "The Tx LINE daily scores Merkle roots PDA (seeds [\"daily_scores_roots\", epoch_day u16 LE])."
+          ]
+        },
+        {
+          "name": "txoracle_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "home",
+          "type": {
+            "defined": {
+              "name": "StatWitness"
+            }
+          }
+        },
+        {
+          "name": "away",
+          "type": {
+            "defined": {
+              "name": "StatWitness"
+            }
+          }
+        },
+        {
+          "name": "status_code",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "reverify",
+      "docs": [
+        "Permissionless re-derivation: re-run the rulebook from the stored receipt and assert it",
+        "still yields the recorded outcome and settlement. Returns `true` on match. Read-only (`.view`)."
+      ],
+      "discriminator": [
+        166,
+        139,
+        219,
+        229,
+        21,
+        184,
+        110,
+        49
+      ],
+      "accounts": [
+        {
+          "name": "market"
+        }
+      ],
+      "args": [],
+      "returns": "bool"
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Market",
+      "discriminator": [
+        219,
+        190,
+        213,
+        55,
+        0,
+        227,
+        198,
+        154
+      ]
+    },
+    {
+      "name": "Position",
+      "discriminator": [
+        170,
+        188,
+        143,
+        228,
+        122,
+        64,
+        247,
+        208
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "MarketResolved",
+      "discriminator": [
+        89,
+        67,
+        230,
+        95,
+        143,
+        106,
+        199,
+        202
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "UnsupportedMarketKind",
+      "msg": "Unsupported market kind"
+    },
+    {
+      "code": 6001,
+      "name": "FeeTooHigh",
+      "msg": "Fee exceeds maximum"
+    },
+    {
+      "code": 6002,
+      "name": "DeadlineInPast",
+      "msg": "Resolve deadline must be in the future"
+    },
+    {
+      "code": 6003,
+      "name": "MarketNotOpen",
+      "msg": "Market is not open"
+    },
+    {
+      "code": 6004,
+      "name": "MarketClosed",
+      "msg": "Market is closed for deposits"
+    },
+    {
+      "code": 6005,
+      "name": "ZeroAmount",
+      "msg": "Amount must be greater than zero"
+    },
+    {
+      "code": 6006,
+      "name": "InvalidOutcome",
+      "msg": "Invalid outcome index"
+    },
+    {
+      "code": 6007,
+      "name": "MathOverflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6008,
+      "name": "AlreadySettled",
+      "msg": "Market already settled"
+    },
+    {
+      "code": 6009,
+      "name": "ResolveWindowPassed",
+      "msg": "Resolve window has passed"
+    },
+    {
+      "code": 6010,
+      "name": "FixtureMismatch",
+      "msg": "Witness fixture does not match this market"
+    },
+    {
+      "code": 6011,
+      "name": "StatKeyMismatch",
+      "msg": "Stat key does not match market configuration"
+    },
+    {
+      "code": 6012,
+      "name": "StatPeriodMismatch",
+      "msg": "Stat period does not match market configuration"
+    },
+    {
+      "code": 6013,
+      "name": "StatNotAuthenticated",
+      "msg": "Stat failed on-chain authentication"
+    },
+    {
+      "code": 6014,
+      "name": "NoReturnData",
+      "msg": "Txoracle returned no data"
+    },
+    {
+      "code": 6015,
+      "name": "InvalidStatus",
+      "msg": "Invalid match status code"
+    },
+    {
+      "code": 6016,
+      "name": "NotSettled",
+      "msg": "Market not settled"
+    },
+    {
+      "code": 6017,
+      "name": "AlreadyClaimed",
+      "msg": "Position already claimed"
+    },
+    {
+      "code": 6018,
+      "name": "NotPositionOwner",
+      "msg": "Signer is not the position owner"
+    }
+  ],
+  "types": [
+    {
+      "name": "CreateMarketArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fixture_id",
+            "type": "i64"
+          },
+          {
+            "name": "market_kind",
+            "type": "u8"
+          },
+          {
+            "name": "home_stat_key",
+            "type": "u32"
+          },
+          {
+            "name": "away_stat_key",
+            "type": "u32"
+          },
+          {
+            "name": "period",
+            "type": "i32"
+          },
+          {
+            "name": "fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "resolve_deadline",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Market",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fixture_id",
+            "type": "i64"
+          },
+          {
+            "name": "market_kind",
+            "type": "u8"
+          },
+          {
+            "name": "home_stat_key",
+            "type": "u32"
+          },
+          {
+            "name": "away_stat_key",
+            "type": "u32"
+          },
+          {
+            "name": "period",
+            "type": "i32"
+          },
+          {
+            "name": "fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "resolve_deadline",
+            "type": "i64"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "usdc_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "pool_home",
+            "type": "u64"
+          },
+          {
+            "name": "pool_draw",
+            "type": "u64"
+          },
+          {
+            "name": "pool_away",
+            "type": "u64"
+          },
+          {
+            "name": "receipt",
+            "type": {
+              "defined": {
+                "name": "ResolutionReceipt"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketResolved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "fixture_id",
+            "type": "i64"
+          },
+          {
+            "name": "outcome_code",
+            "type": "u8"
+          },
+          {
+            "name": "paid_as_refund",
+            "type": "bool"
+          },
+          {
+            "name": "home_goals",
+            "type": "i32"
+          },
+          {
+            "name": "away_goals",
+            "type": "i32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Position",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "stake_home",
+            "type": "u64"
+          },
+          {
+            "name": "stake_draw",
+            "type": "u64"
+          },
+          {
+            "name": "stake_away",
+            "type": "u64"
+          },
+          {
+            "name": "claimed",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProofNode",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "is_right_sibling",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ResolutionReceipt",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "source_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "ruleset_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "home_goals",
+            "type": "i32"
+          },
+          {
+            "name": "away_goals",
+            "type": "i32"
+          },
+          {
+            "name": "status_code",
+            "type": "u8"
+          },
+          {
+            "name": "outcome_code",
+            "type": "u8"
+          },
+          {
+            "name": "paid_as_refund",
+            "type": "bool"
+          },
+          {
+            "name": "pot",
+            "type": "u64"
+          },
+          {
+            "name": "fee",
+            "type": "u64"
+          },
+          {
+            "name": "net",
+            "type": "u64"
+          },
+          {
+            "name": "winning_pool",
+            "type": "u64"
+          },
+          {
+            "name": "resolved_ts",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ScoreStat",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "key",
+            "type": "u32"
+          },
+          {
+            "name": "value",
+            "type": "i32"
+          },
+          {
+            "name": "period",
+            "type": "i32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ScoresBatchSummary",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fixture_id",
+            "type": "i64"
+          },
+          {
+            "name": "update_stats",
+            "type": {
+              "defined": {
+                "name": "ScoresUpdateStats"
+              }
+            }
+          },
+          {
+            "name": "events_sub_tree_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ScoresUpdateStats",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "update_count",
+            "type": "i32"
+          },
+          {
+            "name": "min_timestamp",
+            "type": "i64"
+          },
+          {
+            "name": "max_timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StatTerm",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stat_to_prove",
+            "type": {
+              "defined": {
+                "name": "ScoreStat"
+              }
+            }
+          },
+          {
+            "name": "event_stat_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "stat_proof",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "ProofNode"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "StatWitness",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "ts",
+            "type": "i64"
+          },
+          {
+            "name": "summary",
+            "type": {
+              "defined": {
+                "name": "ScoresBatchSummary"
+              }
+            }
+          },
+          {
+            "name": "fixture_proof",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "ProofNode"
+                }
+              }
+            }
+          },
+          {
+            "name": "main_tree_proof",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "ProofNode"
+                }
+              }
+            }
+          },
+          {
+            "name": "stat",
+            "type": {
+              "defined": {
+                "name": "StatTerm"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

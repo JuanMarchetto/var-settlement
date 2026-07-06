@@ -1,0 +1,13 @@
+[package]
+name = "mock-txoracle"
+version = "0.1.0"
+edition = "2021"
+description = "Test-only mock of Tx LINE's Txoracle: attests every stat as valid (returns bool true). Devnet integration testing only — NOT for mainnet."
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "mock_txoracle"
+
+[dependencies]
+solana-program = "2.3"
