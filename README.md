@@ -10,15 +10,18 @@ markets on Solana. Built for the **Superteam World Cup Hackathon, Track 1: Predi
 Settlement** (submitted 2026-07-19). Data source: TxODDS **Tx LINE** (`Txoracle` program).
 
 > **Proof it's real — open these first:**
-> - **Live real-feed settlement on devnet:** real fixture **18192996** settled against Tx LINE's
->   on-chain Merkle root — [`resolve` tx on Solana Explorer](https://explorer.solana.com/tx/4j2ukzmW8rJNMAuCiyyKaiqksviB6mZS26e4FSfFuhBynV5mQXv8DMasLJUopv3XUC4BsFHQxPNPLPoj69oVtnyC?cluster=devnet)
->   — outcome **Away**, winner paid pro-rata. Every signature: [`DEPLOYMENTS.md`](DEPLOYMENTS.md).
-> - **Permissionless re-verification:** a stranger wallet that never created, funded, or resolved
->   the market re-derives the whole resolution and gets `true`:
->   `cd tests-devnet && bun install && bun run reverify.ts A81iUQpYd5HuQvkyvpB8YjpvMQwVP8L7xuwak3a9TNYL`
+> - **A real World Cup fixture, settled on-chain against Tx LINE's live Merkle feed.** Market
+>   [`GaiXEuSBb3spjoptxHCoyScycN4sCy164jCF3jT9v8T3`](https://explorer.solana.com/address/GaiXEuSBb3spjoptxHCoyScycN4sCy164jCF3jT9v8T3?cluster=devnet)
+>   — fixture 18192996, authenticated scoreline 2–3, outcome **Away**, winner paid pro-rata.
+> - **Re-derive it yourself, from any wallet** (permissionless, read-only, no signer, no fee):
+>   ```
+>   cd tests-devnet && bun install
+>   bun run reverify.ts GaiXEuSBb3spjoptxHCoyScycN4sCy164jCF3jT9v8T3   # -> reverify -> true
+>   ```
 > - **4 Kani formal proofs, all PASS** — re-run in one command: `cd crates/rulebook && cargo kani`
 >   (committed transcript: [`docs/KANI_PROOF_TRANSCRIPT.txt`](docs/KANI_PROOF_TRANSCRIPT.txt)).
 > - **Program live on devnet:** [`AepSNpDzMUdBgjxA9irxxL7NTQHxXtDVq6rnqq17Lxk`](https://explorer.solana.com/address/AepSNpDzMUdBgjxA9irxxL7NTQHxXtDVq6rnqq17Lxk?cluster=devnet)
+>   · every transaction signature: [`DEPLOYMENTS.md`](DEPLOYMENTS.md)
 >
 > Submission text: [`SUBMISSION.md`](SUBMISSION.md) · on-chain evidence: [`DEPLOYMENTS.md`](DEPLOYMENTS.md)
 
@@ -121,9 +124,9 @@ receipt is reproducible from scratch, not just internally consistent.
 - **INV-1 — totality / fail-closed** (`inv1_resolve_outcome_total_and_correct`): `resolve_outcome`
   is total over the full input range — it always returns exactly one `Outcome`, never panics, and
   degenerate goal counts or a non-`Completed*` status always resolve to `Refund`.
-- **INV-2 — conservation** (`inv2_settlement_conserves`): `pot == home + draw + away`,
-  `fee + net == pot`, and `net <= pot` always; refunds always carry `fee == 0`. The program cannot
-  mint value at the pool level — every unit paid out came from the pot.
+- **INV-2 — conservation** (`inv2_settlement_conserves`): `pot == home + draw + away` always; on a
+  paying settlement `fee + net == pot` and `net <= pot`; on a refund `fee == 0` and `net == 0`. The
+  program cannot mint value at the pool level — every unit paid out came from the pot.
 - **INV-3 — settlement fail-closed** (`inv3_settle_fail_closed`): `Outcome::Refund` and any
   `fee_bps > MAX_FEE_BPS` always settle as a full refund with `fee == 0`.
 - **INV-4 — determinism** (`inv4_resolve_outcome_deterministic`): identical inputs always yield an
@@ -148,11 +151,14 @@ Verified by hand against `txline.txodds.com/documentation` and the on-chain IDL 
 - **`Txoracle` program**: mainnet `9ExbZjAapQww1vfcisDmrngPinHTEfpjYRWMunJgcKaA`, devnet
   `6pW64gN1s2uqjHkn1unFeEjAwJkPGHoppGvS715wyP2J`.
 - **API host**: mainnet `https://txline.txodds.com/api`, devnet `https://txline-dev.txodds.com/api`.
-- **Free World Cup activation** (`packages/sdk/src/txline.ts::TxLineClient.activate`), no payment,
-  no TxL token: on-chain `subscribe(serviceLevel, durationWeeks)` → `POST /auth/guest/start` (guest
-  JWT) → wallet-sign `${txSig}:${leagues}:${jwt}` with Ed25519/tweetnacl → `POST
-  /api/token/activate` returns an `X-Api-Token`. Data calls send both `Authorization: Bearer <jwt>`
-  and `X-Api-Token: <token>`.
+- **Free World Cup activation**, no payment, no TxL token charged: on-chain
+  `subscribe(serviceLevel, durationWeeks)` → `POST /auth/guest/start` (guest JWT) → wallet-sign
+  `${txSig}:${leagues}:${jwt}` with Ed25519/tweetnacl → `POST /api/token/activate` returns an
+  `X-Api-Token`. Data calls send both `Authorization: Bearer <jwt>` and `X-Api-Token: <token>`.
+  The implementation that has actually been run live end-to-end is
+  `tests-devnet/txline-activate.ts`; `packages/sdk/src/txline.ts::TxLineClient.activate` is the
+  library-shaped version of the same flow (its `subscribe()` is still a stub — the script builds
+  the `subscribe` instruction directly).
 - **Service levels**: **L1** = World Cup/Friendlies, 60s-delayed, works on devnet. **L12** =
   real-time sub-second, **mainnet only**.
 - **`validate_stat`** — the settlement primitive, called from
@@ -233,7 +239,7 @@ market already settled on devnet — from any wallet, even one that never touche
 
 ```bash
 cd tests-devnet && bun install
-bun run reverify.ts A81iUQpYd5HuQvkyvpB8YjpvMQwVP8L7xuwak3a9TNYL   # -> reverify -> true
+bun run reverify.ts GaiXEuSBb3spjoptxHCoyScycN4sCy164jCF3jT9v8T3   # -> reverify -> true
 ```
 
 `cargo test -p rulebook` is fast and deterministic. `cargo kani -p rulebook` runs Kani's bounded
@@ -251,12 +257,14 @@ re-run):
   cases, all green. `cargo check -p var-settlement` — clean, exit 0.
 - **Deployed on devnet:** [`AepSNpDzMUdBgjxA9irxxL7NTQHxXtDVq6rnqq17Lxk`](https://explorer.solana.com/address/AepSNpDzMUdBgjxA9irxxL7NTQHxXtDVq6rnqq17Lxk?cluster=devnet).
 - **End-to-end devnet smoke test PASSED** (`tests-devnet/smoke.ts`): full
-  `create → deposit → resolve → reverify → claim` lifecycle with real SPL transfers; final
-  balances 158 / 40 / 2 (the 2% fee) match the rulebook math exactly.
+  `create → deposit → attest_home → resolve → reverify → claim` lifecycle with real SPL transfers;
+  final balances 158 / 40 / 2 (the 2% fee) match the rulebook math exactly. (This one runs against
+  the *mock* oracle — it exercises the escrow/claim machinery; real-feed authentication is the next
+  bullet.)
 - **LIVE settlement of a real fixture against the real feed:** fixture **18192996** (home 2 – 3
   away) authenticated via live Tx LINE `stat-validation` Merkle proofs and settled by two-step CPI
-  into the **real** devnet `Txoracle` over the on-chain daily root —
-  [`resolve` tx](https://explorer.solana.com/tx/4j2ukzmW8rJNMAuCiyyKaiqksviB6mZS26e4FSfFuhBynV5mQXv8DMasLJUopv3XUC4BsFHQxPNPLPoj69oVtnyC?cluster=devnet),
+  into the **real** devnet `Txoracle` over the on-chain daily root — settled market
+  [`GaiXEuSBb3spjoptxHCoyScycN4sCy164jCF3jT9v8T3`](https://explorer.solana.com/address/GaiXEuSBb3spjoptxHCoyScycN4sCy164jCF3jT9v8T3?cluster=devnet),
   outcome **Away**, winner paid. A stranger wallet re-derives it: `reverify() → true`.
 - Tx LINE's free World Cup tier (4-step activation) run live end-to-end — activation tx in
   `DEPLOYMENTS.md`.
@@ -277,6 +285,8 @@ Nothing here claims more than what's been run. See `SUBMISSION_CHECKLIST.md` for
 ## Compliance note
 
 VAR is positioned strictly as **settlement infrastructure / verification tooling**, not an operated
-sportsbook. Pools settle in **USDC only** — the product path never touches, requires, or references
-the TxL token. Entry is free-to-enter parimutuel pools (stake USDC on an outcome, winners split the
-net pot pro-rata). No order book, no market-making, no custody beyond escrow-until-settlement.
+sportsbook. Pools settle in **USDC only** — the settlement path never touches, requires, or
+references the TxL token, and **zero TxL is ever paid** (the free World Cup tier's `subscribe` call
+passes the TxL mint/treasury accounts the `Txoracle` interface requires, at a price of 0). Entry is
+free-to-enter parimutuel pools (stake USDC on an outcome, winners split the net pot pro-rata). No
+order book, no market-making, no custody beyond escrow-until-settlement.

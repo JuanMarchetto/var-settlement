@@ -1,13 +1,27 @@
+$ cargo kani --version
+cargo-kani 0.67.0
+
+$ cargo kani   # crates/rulebook, 2026-07-19T16:33:46Z
+Kani Rust Verifier 0.67.0 (cargo plugin)
+
 Checking harness proofs::inv3_settle_fail_closed...
+RESULTS:
  ** 0 of 60 failed (3 unreachable)
 VERIFICATION:- SUCCESSFUL
+Verification Time: 0.114933915s
 Checking harness proofs::inv2_settlement_conserves...
+RESULTS:
  ** 0 of 68 failed
 VERIFICATION:- SUCCESSFUL
+Verification Time: 0.36993575s
 Checking harness proofs::inv4_resolve_outcome_deterministic...
+RESULTS:
  ** 0 of 58 failed
 VERIFICATION:- SUCCESSFUL
+Verification Time: 0.06349552s
 Checking harness proofs::inv1_resolve_outcome_total_and_correct...
+RESULTS:
  ** 0 of 64 failed
 VERIFICATION:- SUCCESSFUL
+Verification Time: 0.098088905s
 Complete - 4 successfully verified harnesses, 0 failures, 4 total.

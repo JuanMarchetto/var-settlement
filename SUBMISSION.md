@@ -7,7 +7,7 @@
 **Track:** Prediction Markets & Settlement ($18,000)
 
 > **Proof it's real (open these first):**
-> - **Live real-feed settlement — `resolve` tx on devnet:** https://explorer.solana.com/tx/4j2ukzmW8rJNMAuCiyyKaiqksviB6mZS26e4FSfFuhBynV5mQXv8DMasLJUopv3XUC4BsFHQxPNPLPoj69oVtnyC?cluster=devnet — outcome **Away**, `reverify() → true`, winner paid pro-rata.
+> - **Live real-feed settlement — `resolve` tx on devnet:** https://explorer.solana.com/tx/3uSfesCgBNN8qAjM2CwLjtCVPquaE3cUk2qkZQc7ndnKFbkStaqs26HNyZtPMFa22ZFj1ucuVSda1TNAeuwHxGYD?cluster=devnet — outcome **Away**, `reverify() → true`, winner paid pro-rata.
 > - **4 Kani formal proofs, all PASS.** Re-run in one command: `cd crates/rulebook && cargo kani`.
 
 ---
@@ -60,7 +60,7 @@ No token vote. No dispute bond. No trusted arbiter. No admin override. Correct-b
 
 - **Real on-chain feed.** Settlement authenticates against Tx LINE's `Txoracle` daily Merkle roots — the `daily_scores_roots` PDA (seeds `[b"daily_scores_roots", (epoch_day as u16).to_le_bytes()]`). Devnet `Txoracle`: `6pW64gN1s2uqjHkn1unFeEjAwJkPGHoppGvS715wyP2J`.
 - **`validate_stat` is the settlement primitive.** It's a predicate checker returning `bool`, not a "read the score" call — so VAR both *knows* the claimed goals (fetched off-chain with their `stat-validation` Merkle proofs) and *authenticates* them via CPI (`EqualTo, threshold = claimed_goals`). A `true` return means the claimed integer is the Merkle-authentic one. Invoked raw against the IDL discriminator since `Txoracle` isn't a workspace dependency.
-- **Free 4-step World Cup activation, live.** No payment, no TxL token: on-chain `subscribe(1, 4)` → `POST /auth/guest/start` (guest JWT) → wallet-signed `${txSig}:${leagues}:${jwt}` (Ed25519/tweetnacl) → `POST /api/token/activate` (X-Api-Token). Runs on the L1 World Cup devnet tier. Verified end-to-end (activation tx `2hnw1aAkGN4RRqfzRyJiDUEKCq1BnuH9Wm7X6vRet2ozvcZJy1ngU16Fu7NBHoV3rpmKWUdRs1PYgJ2c1C5w778C`).
+- **Free 4-step World Cup activation, live.** No payment, no TxL token: on-chain `subscribe(1, 4)` → `POST /auth/guest/start` (guest JWT) → wallet-signed `${txSig}:${leagues}:${jwt}` (Ed25519/tweetnacl) → `POST /api/token/activate` (X-Api-Token). Runs on the L1 World Cup devnet tier. Verified end-to-end (activation tx `4ZFya1o9yPCXMCdjDJXTEoHcsYChrhZQDNFYdnPrzPRRiwhENkFQ1yheRcw5PrAJx8GatZT1kSoqxakmdE2rqMDQ`).
 
 ---
 
@@ -70,25 +70,30 @@ Every claim below is backed by evidence in the repo — clone it and re-run.
 
 - **4 Kani formal proofs, all PASS** (`cd crates/rulebook && cargo kani`; transcript at `docs/KANI_PROOF_TRANSCRIPT.txt`, `Complete - 4 successfully verified harnesses, 0 failures`):
   - **INV-1** totality / fail-closed — `resolve_outcome` is total, never panics, and every non-`Completed` / degenerate state resolves to `Refund`.
-  - **INV-2** fee conservation — `fee + net == pot`, `net ≤ pot`, no payout ever exceeds `net`. The program cannot mint value.
+  - **INV-2** fee conservation — `pot == home + draw + away`; on a paying settlement `fee + net == pot` and `net ≤ pot`; on a refund `fee == 0, net == 0`. The program cannot mint value. (The *per-winner* payout bound — no payout or split of payouts exceeds `net` — divides by a symbolic `u128` divisor, intractable for the model checker, so it's covered by 12,000 property-test cases in `crates/rulebook/tests/payout_props.rs` instead.)
   - **INV-3** settlement fail-closed — `Refund` and any out-of-range `fee_bps` always settle as a zero-fee full refund.
   - **INV-4** determinism — identical inputs always yield an identical resolution; no hidden state, clock, or randomness.
 - **Test suite** (`cargo test -p rulebook`): 22 unit tests + 12 golden real-World-Cup vectors (Argentina–France 2022 penalties → **Draw** on the 90' scoreline, VAR-disallowed goal, abandonment/postponement/void → Refund, zero-winning-pool refund) + 3 proptest properties × 4,000 cases each (12,000 cases at full USDC magnitude).
-- **Deployed on devnet:** `var_settlement` = `AepSNpDzMUdBgjxA9irxxL7NTQHxXtDVq6rnqq17Lxk` (352KB, upgraded, upgrade authority = builder wallet).
+- **Deployed on devnet:** `var_settlement` = `AepSNpDzMUdBgjxA9irxxL7NTQHxXtDVq6rnqq17Lxk` (347 KiB, upgraded, upgrade authority = builder wallet).
 - **Live settlement against the real feed (devnet):** real fixture **18192996** (feed score home **2 – 3** away), authenticated via live Tx LINE `stat-validation` Merkle proofs and resolved by two-step CPI into the **real** `Txoracle` over the on-chain daily root (needs a 1.4M compute-unit budget — Merkle verification is CU-heavy). The two **goal counts** are Merkle-authenticated on-chain; the `Completed` match-status code is supplied by the resolver and fail-closed by the proven rulebook. Result: outcome **Away**, `reverify() → true`, winning pool paid pro-rata.
-  - `attest_home` tx: `53dkuaseF6pAD71WDAaPUzwEQFQ6keWgRuafVM8DBqyvBZqWMwQg3GAtzbuJP5fSFYJ1rxpDKbE7HMK1AXtfbsws`
-  - `resolve` tx: `4j2ukzmW8rJNMAuCiyyKaiqksviB6mZS26e4FSfFuhBynV5mQXv8DMasLJUopv3XUC4BsFHQxPNPLPoj69oVtnyC`
-- **End-to-end smoke test PASSES** (`tests-devnet/smoke.ts`): full `create → deposit → resolve → reverify → claim` lifecycle with real SPL transfers; receipt outcome `Home`, `reverify() → true`, final balances **158 / 40 / 2** (the 2% protocol fee), exactly the rulebook's settlement math. (Uses a mock `Txoracle` — test-only devnet `85KwDRzyZeG8wAXVCZo2CKTVor3qVcyhq7vk2yAzBJMw`, never used on mainnet.)
+  - `attest_home` tx: `xuUExMAXeovpdcwMXegQMcpd49mampkqxWNdQze7Lf7ZzuKV1GbiyGppCSA1YbEXtD45byjF6ZS8zTAchba5MbJ`
+  - `resolve` tx: `3uSfesCgBNN8qAjM2CwLjtCVPquaE3cUk2qkZQc7ndnKFbkStaqs26HNyZtPMFa22ZFj1ucuVSda1TNAeuwHxGYD`
+- **End-to-end smoke test PASSES** (`tests-devnet/smoke.ts`): full `create → deposit → attest_home → resolve → reverify → claim` lifecycle with real SPL transfers; receipt outcome `Home`, `reverify() → true`, final balances **158 / 40 / 2** (the 2% protocol fee), exactly the rulebook's settlement math. (Uses a mock `Txoracle` — test-only devnet `85KwDRzyZeG8wAXVCZo2CKTVor3qVcyhq7vk2yAzBJMw`, never used on mainnet.)
 
 ---
 
 ## Links
 
 - **GitHub repo:** https://github.com/JuanMarchetto/var-settlement
-- **Live `resolve` tx (Solana Explorer, devnet):** https://explorer.solana.com/tx/4j2ukzmW8rJNMAuCiyyKaiqksviB6mZS26e4FSfFuhBynV5mQXv8DMasLJUopv3XUC4BsFHQxPNPLPoj69oVtnyC?cluster=devnet
+- **Settled market — the real fixture, on-chain (Solana Explorer, devnet):** https://explorer.solana.com/address/GaiXEuSBb3spjoptxHCoyScycN4sCy164jCF3jT9v8T3?cluster=devnet
+- **Live `resolve` tx (Solana Explorer, devnet):** https://explorer.solana.com/tx/3uSfesCgBNN8qAjM2CwLjtCVPquaE3cUk2qkZQc7ndnKFbkStaqs26HNyZtPMFa22ZFj1ucuVSda1TNAeuwHxGYD?cluster=devnet
 - **Program (Solana Explorer, devnet):** https://explorer.solana.com/address/AepSNpDzMUdBgjxA9irxxL7NTQHxXtDVq6rnqq17Lxk?cluster=devnet
-- **Demo video:** _added at submission time — until then, the live `resolve` tx above is the primary evidence_
-- **Verify it yourself:** `cargo test -p rulebook` · `cd crates/rulebook && cargo kani`
+- **Demo video:** _added at submission time — until then, the settled market above is the primary evidence_
+- **Verify it yourself:** `cargo test -p rulebook` · `cd crates/rulebook && cargo kani` · `cd tests-devnet && bun install && bun run reverify.ts GaiXEuSBb3spjoptxHCoyScycN4sCy164jCF3jT9v8T3`
+
+> Devnet prunes transaction history after ~2 weeks, so tx links age out while **accounts** stay
+> queryable forever — the settled market and the `reverify` command above are the durable evidence.
+> All signatures were re-minted 2026-07-19; the full audit trail is in `DEPLOYMENTS.md`.
 
 ---
 
@@ -109,4 +114,4 @@ Rust · Anchor 0.32 · **Kani 0.67** (formal verification / bounded model checki
 
 ## Compliance
 
-VAR is settlement infrastructure / verification tooling — not an operated sportsbook. Pools settle in **USDC only**; the product path never touches, requires, or references the TxL token. Free-to-enter parimutuel pools, no order book, no market-making, and **non-custodial beyond deterministic on-chain escrow** — the vault PDA holds USDC under program rules until settlement, with no admin withdrawal path.
+VAR is settlement infrastructure / verification tooling — not an operated sportsbook. Pools settle in **USDC only**; the settlement path never touches, requires, or references the TxL token, and **zero TxL is ever paid** (the hackathon's World Cup tier is free — the `subscribe` call passes the TxL mint/treasury accounts the `Txoracle` interface requires, at a price of 0). Free-to-enter parimutuel pools, no order book, no market-making, and **non-custodial beyond deterministic on-chain escrow** — the vault PDA holds USDC under program rules until settlement, with no admin withdrawal path.

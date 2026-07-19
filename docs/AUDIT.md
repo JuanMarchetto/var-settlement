@@ -78,15 +78,20 @@ Known Limitations. The happy-path `claim` is exercised end-to-end on devnet by
 `tests-devnet/smoke.ts` (both winner and loser claims, real SPL transfers); an explicit
 second-claim-must-fail devnet test is a cheap follow-up an auditor should ask for.
 
-## Stat-key binding (anti cross-stat-spoofing)
+## Fixture / stat-key binding (anti cross-stat-spoofing)
 
-Before any CPI happens, `resolve()` checks:
+Settlement is two instructions, and each binds its own witness before any CPI happens.
+`attest_home` checks the home side:
 ```rust
+require!(home.summary.fixture_id == m.fixture_id, VarError::FixtureMismatch);
 require!(home.stat.stat_to_prove.key == m.home_stat_key, VarError::StatKeyMismatch);
-require!(away.stat.stat_to_prove.key == m.away_stat_key, VarError::StatKeyMismatch);
 require!(home.stat.stat_to_prove.period == m.period, VarError::StatPeriodMismatch);
-require!(away.stat.stat_to_prove.period == m.period, VarError::StatPeriodMismatch);
 ```
+and `resolve` checks the away side identically (`m.away_stat_key`), plus
+`require!(m.home_attested, VarError::HomeNotAttested)` so a resolution can't skip the home proof.
+Because both witnesses are compared against the *same* `m.fixture_id`, a cross-fixture home/away
+pair is transitively rejected.
+
 Without this, `validate_stat` would happily authenticate *some* true stat off the feed (a corner
 count, a different fixture's goal stat, the wrong period) and the program would have no way to tell
 it isn't the home/away regulation-goals stat this specific market was created against. The market's
@@ -166,8 +171,8 @@ In priority order:
    `away.summary.fixture_id == m.fixture_id` (`VarError::FixtureMismatch`), on top of the
    stat-key/period checks, so a cross-fixture home/away witness pair is transitively rejected.
    (This was a real gap found and closed during this audit — see the resolution note below.)
-3. **The Kani proof bounds** — are `-3..=20` goals and `<=500`/`<=1000` pool values wide enough to
-   call this "exhaustive in practice," or should they be widened before calling INV-1..4 airtight for
+3. **The Kani proof bounds** — are `-3..=20` goals and `<=1000` pool values wide enough to call
+   this "exhaustive in practice," or should they be widened before calling INV-1..4 airtight for
    mainnet-scale pools?
 4. **The devnet integration suite** (`tests-devnet/`) — `smoke.ts` covers the full happy path with
    real account state and SPL transfers; what it does *not* yet cover is a second-claim-must-fail

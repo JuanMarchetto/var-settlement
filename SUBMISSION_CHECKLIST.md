@@ -23,12 +23,13 @@ Status for the same claims in narrative form.
 
 ## Done — on-chain
 
-- [x] **SBF build.** `cargo build-sbf` produces `target/deploy/var_settlement.so` (352 KB, deployable).
+- [x] **SBF build.** `cargo build-sbf` produces `target/deploy/var_settlement.so` (355,512 bytes / 347 KiB, deployable).
 - [x] **Devnet deploy.** `var_settlement` live at `AepSNpDzMUdBgjxA9irxxL7NTQHxXtDVq6rnqq17Lxk`;
       mock `Txoracle` at `85KwDRzyZeG8wAXVCZo2CKTVor3qVcyhq7vk2yAzBJMw`. See `DEPLOYMENTS.md`.
 - [x] **End-to-end integration test on devnet.** `tests-devnet/smoke.ts` drives create → deposit(Home,
-      Away) → resolve(Home 2-0, CPI `validate_stat`) → reverify(`true`) → claim, with real SPL-token
-      transfers. Final balances 158/40/2 (2% fee) match the rulebook exactly. **PASSED, exit 0.**
+      Away) → attest_home → resolve(Home 2-0, CPI `validate_stat`) → reverify(`true`) → claim, with
+      real SPL-token transfers. Final balances 158/40/2 (2% fee) match the rulebook exactly.
+      **PASSED, exit 0.**
       (`litesvm` in-process tests were blocked offline by an `openssl-sys` build dep, so the check is
       done directly on devnet instead — stronger evidence anyway.)
 
@@ -61,15 +62,15 @@ Status for the same claims in narrative form.
   market. Devnet is the target and it's sufficient — Tx LINE's free World Cup tier is devnet L1,
   and mainnet is not a hackathon requirement (see `SUBMISSION.md` §Honest status). Post-hackathon.
 
-## Non-negotiable floor (per `spec.md` descope plan)
+## Non-negotiable floor (per `spec.md` descope plan) — **all three cleared**
 
-If time runs short before 2026-07-19, the floor that must hold regardless of what else slips:
-1. The Kani-proven rulebook (already true today).
-2. The on-chain resolve/claim/reverify path, exercised against real accounts (needs the SBF
-   build + deploy + `litesvm`/devnet gates above).
-3. One real settled market, end to end, even if that means devnet L1 (60s-delayed) plus an
-   explicitly-labeled simulated replay of a real match's score sequence instead of a live mainnet
-   run (`spec.md` §1, descope floor).
+The floor that had to hold regardless of what else slipped:
+1. ✅ The Kani-proven rulebook — 4 harnesses, 0 failures.
+2. ✅ The on-chain resolve/claim/reverify path exercised against real accounts — SBF build, devnet
+   deploy, and the `tests-devnet/smoke.ts` lifecycle run with real SPL transfers.
+3. ✅ One real settled market, end to end — and better than the floor allowed: not a simulated
+   replay but a **live** authentication of fixture 18192996's goal counts against Tx LINE's real
+   on-chain daily Merkle root, re-derivable by any stranger wallet via `reverify`.
 
-That combination alone clears "working, verifiable settlement" — everything else on this list
-strengthens the submission but isn't the bar for a legitimate one.
+That combination clears "working, verifiable settlement" — the remaining gates above strengthen
+the submission but aren't the bar for a legitimate one.

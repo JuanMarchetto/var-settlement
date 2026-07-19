@@ -30,19 +30,23 @@ is proven, not trusted.
 
 ## Untrusted (and why it can't hurt you)
 
-**The `resolve` caller.** `resolve` in `programs/var-settlement/src/lib.rs` is permissionless —
-`Resolve` accounts require only `resolver: Signer<'info>`, no allowlist, no admin key. Anyone can
-call it. That's fine because a malicious or careless caller cannot:
+**The resolution caller.** Settlement is two permissionless instructions — `attest_home` (home
+goals) then `resolve` (away goals + status) — both requiring only `resolver: Signer<'info>`, no
+allowlist, no admin key. Anyone can call them. That's fine because a malicious or careless caller
+cannot:
 
-- **Lie about the score.** `resolve` doesn't take the caller's word for `home_goals`/`away_goals`.
-  It CPIs `Txoracle::validate_stat` once per side with `comparison = EqualTo, threshold = <claimed
-  value>` (`txoracle_cpi::validate_stat_equal`). Both calls must return `true` against the on-chain
-  `daily_scores_merkle_roots` PDA, or `resolve` errors with `StatNotAuthenticated`. A caller who
-  submits a false scoreline just gets a failed transaction, not a bad settlement.
-- **Point the proof at the wrong stat.** Each `StatWitness` is bound to the market's configured
-  `home_stat_key`/`away_stat_key`/`period` before it's trusted (`StatKeyMismatch` /
-  `StatPeriodMismatch` checks). Without this, a caller could authenticate *some* true stat from the
-  feed (e.g. a different fixture, or a corner-kick count) and pass it off as the goals stat.
+- **Lie about the score.** Neither instruction takes the caller's word for the goal counts. Each
+  CPIs `Txoracle::validate_stat` for its own side with `comparison = EqualTo, threshold = <claimed
+  value>` (`txoracle_cpi::validate_stat_equal`). The call must return `true` against the on-chain
+  `daily_scores_merkle_roots` PDA or the instruction errors with `StatNotAuthenticated`, and
+  `resolve` additionally requires the home side to have been attested first (`HomeNotAttested`), so
+  a settlement cannot skip a proof. A caller who submits a false scoreline just gets a failed
+  transaction, not a bad settlement.
+- **Point the proof at the wrong fixture or stat.** Each `StatWitness` is bound to the market's own
+  `fixture_id` and its configured `home_stat_key`/`away_stat_key`/`period` before it's trusted
+  (`FixtureMismatch` / `StatKeyMismatch` / `StatPeriodMismatch`). Without this, a caller could
+  authenticate *some* true stat from the feed (a different fixture's goals, or a corner-kick count)
+  and pass it off as this market's goals stat.
 - **Resolve early.** Early settlement is blocked by the feed itself: `validate_stat` fails against
   the on-chain daily root until the root covering the final score has actually published, so a
   premature resolve gets `StatNotAuthenticated`, not a settlement (see `docs/AUDIT.md` — there is
@@ -51,7 +55,7 @@ call it. That's fine because a malicious or careless caller cannot:
   bounds the other side — how *late* a resolve is still accepted (deadline plus a 7-day grace
   period for root-publish lag).
 - **Resolve twice or flip the result.** `require!(m.status == MarketStatus::Open as u8,
-  VarError::AlreadySettled)` at the top of `resolve` — once `Market.status` flips to `Settled` the
+  VarError::AlreadySettled)` at the top of both steps — once `Market.status` flips to `Settled` the
   instruction is a no-op path (it errors out), permanently. There is no `un-resolve`, no admin
   override, no re-resolve-with-different-data instruction anywhere in the program.
 - **Double-pay a position.** `claim()` requires `!p.claimed` and sets `p.claimed = true` before any

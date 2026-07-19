@@ -84,7 +84,6 @@ async function main() {
   });
   const raw = await actRes.text();
   console.log(`  activate: status=${actRes.status} enc=${actRes.headers.get("content-encoding")} ct=${actRes.headers.get("content-type")}`);
-  console.log(`  body[:400]: ${raw.slice(0, 400)}`);
   if (!actRes.ok) throw new Error(`activate HTTP ${actRes.status}: ${raw.slice(0, 200)}`);
   // The endpoint returns the API token as plain text (or JSON on some hosts).
   let apiToken: string;
@@ -94,7 +93,8 @@ async function main() {
   } catch {
     apiToken = raw.trim();
   }
-  console.log(`  API token: ${String(apiToken).slice(0, 24)}...`);
+  // Never print the token itself — this output gets pasted into docs/demos.
+  console.log(`  API token: received (${String(apiToken).length} chars) -> .txline-creds.json`);
 
   writeFileSync(new URL("./.txline-creds.json", import.meta.url), JSON.stringify({ jwt, apiToken, txSig }, null, 2));
   console.log("\nACTIVATION OK -> saved .txline-creds.json");
