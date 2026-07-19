@@ -13,9 +13,9 @@
 
 - **Terminal:** dark theme, font **18–20 pt**, ~110–120 columns, generous line height. One prompt visible, scrollback clean.
 - **Three panes to pre-open:**
-  - **Tab A — Proofs:** `cd /home/marche/var-settlement/crates/rulebook` (runs `cargo kani`, then `cargo test`).
-  - **Tab B — Live settlement:** `cd /home/marche/var-settlement/tests-devnet` (the real Tx LINE settle — **pre-warmed**, see below).
-  - **Tab C — Permissionless reverify:** `cd /home/marche/var-settlement/tests-devnet` (the stranger-wallet `reverify`, run **live** on camera).
+  - **Tab A — Proofs:** `cd crates/rulebook` (runs `cargo kani`, then `cargo test`).
+  - **Tab B — Live settlement:** `cd tests-devnet` (the real Tx LINE settle — **pre-warmed**, see below).
+  - **Tab C — Permissionless reverify:** `cd tests-devnet` (the stranger-wallet `reverify`, run **live** on camera).
   - **Browser:** Solana Explorer, resolve-tx URL preloaded but not yet revealed (see Assets).
 - **Pre-warm before rolling (these are slow and the live API token is short-lived):**
   1. **Kani:** run `cargo kani` once so results are cached; on camera re-run it and let the cached `Complete - 4 …` line land, or speed-ramp the live run and label it `2×, unedited`.

@@ -5,3 +5,5 @@ node_modules
 test-ledger
 .gstack/
 tests-devnet/.txline-creds.json
+claude-session*.jsonl
+grant-application-drive/

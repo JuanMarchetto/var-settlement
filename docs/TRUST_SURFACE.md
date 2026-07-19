@@ -43,10 +43,13 @@ call it. That's fine because a malicious or careless caller cannot:
   `home_stat_key`/`away_stat_key`/`period` before it's trusted (`StatKeyMismatch` /
   `StatPeriodMismatch` checks). Without this, a caller could authenticate *some* true stat from the
   feed (e.g. a different fixture, or a corner-kick count) and pass it off as the goals stat.
-- **Resolve early.** `require!(now <= m.resolve_deadline.saturating_add(RESOLVE_GRACE_SECS), ...)` —
-  resolution is only accepted inside the configured window (deadline plus a 7-day grace period for
-  root-publish lag). There's no path to settling a market before its match has actually concluded
-  and the covering root is live.
+- **Resolve early.** Early settlement is blocked by the feed itself: `validate_stat` fails against
+  the on-chain daily root until the root covering the final score has actually published, so a
+  premature resolve gets `StatNotAuthenticated`, not a settlement (see `docs/AUDIT.md` — there is
+  deliberately no separate minimum-time check; the Merkle authentication *is* the gate). The
+  deadline check `require!(now <= m.resolve_deadline.saturating_add(RESOLVE_GRACE_SECS), ...)`
+  bounds the other side — how *late* a resolve is still accepted (deadline plus a 7-day grace
+  period for root-publish lag).
 - **Resolve twice or flip the result.** `require!(m.status == MarketStatus::Open as u8,
   VarError::AlreadySettled)` at the top of `resolve` — once `Market.status` flips to `Settled` the
   instruction is a no-op path (it errors out), permanently. There is no `un-resolve`, no admin
@@ -54,9 +57,11 @@ call it. That's fine because a malicious or careless caller cannot:
 - **Double-pay a position.** `claim()` requires `!p.claimed` and sets `p.claimed = true` before any
   transfer executes. A `Position` PDA pays out at most once, structurally, regardless of how many
   times `claim` is invoked against it.
-- **Mint value.** Every payout is `winner_payout()`, which is bounded by Kani's INV-2/INV-2b to
-  never exceed `net` (pot minus fee) in aggregate. The vault can't be drained beyond what was
-  escrowed.
+- **Mint value.** Every payout is `winner_payout()`. Pool-level conservation (`fee + net == pot`,
+  `net <= pot`) is proven by Kani's INV-2; the per-winner bound (no payout, or split of payouts,
+  exceeds `net`) is covered by 12,000 property-test cases in `crates/rulebook/tests/payout_props.rs`
+  (symbolic `u128` division is intractable for the model checker — see `docs/AUDIT.md`). The vault
+  can't be drained beyond what was escrowed.
 
 **The depositor.** Depositors can only stake into one of the three defined outcome buckets
 (`InvalidOutcome` guards anything outside `Home`/`Draw`/`Away`), and stakes are non-negative amounts
@@ -94,5 +99,6 @@ instead of a refund.
   committed to the Merkle root, VAR settles on that wrong root, correctly and deterministically. This
   is the one input VAR cannot verify past, by design and by necessity — see `docs/AUDIT.md` for how
   this is scoped as a known limitation, not a hidden one.
-- **Program upgrade authority** (out of scope for this doc — see `docs/AUDIT.md` for the ops-level
-  discussion of deploy keys).
+- **Program upgrade authority** (out of scope for this doc — the devnet deployment and its upgrade
+  authority are recorded in `DEPLOYMENTS.md`; mainnet ops policy for deploy keys is a pre-mainnet
+  decision, not a V1 artifact).

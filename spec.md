@@ -5,6 +5,12 @@
 Superteam World Cup Hackathon — Track 1: *Prediction Markets & Settlement* ($18,000).
 Data: TxODDS **Tx LINE** (`Txoracle` program). Deadline: 2026-07-19.
 
+> **Note — this is the original design spec (2026-07-05), kept as written.** The as-built system is
+> documented in `README.md` and `DEPLOYMENTS.md`; where they differ (two-step `attest_home` +
+> `resolve` instead of a single `resolve`, 4 Kani harnesses + a proptest-covered solvency bound
+> instead of INV-1..5 all in Kani, devnet integration tests instead of `litesvm`), the as-built
+> docs win.
+
 ---
 
 ## 0. One-paragraph thesis
@@ -233,10 +239,9 @@ reverify() -> bool:                            // permissionless, read-only (.vi
 
 ## 8. Compliance framing
 Positioned strictly as **settlement infrastructure / verification tooling**, settled in **USDC**,
-never the TxL token, never an operated book. Free-to-enter parimutuel pools. KYC prepared early for an
-Argentina payout.
+never the TxL token, never an operated book. Free-to-enter parimutuel pools.
 
 ## 9. Deliverables (submission gate)
-Public GitHub repo (fresh, in-window git) · 5-min demo video · README with copy-paste "verify it
+Public GitHub repo (fresh, in-window git) · 3-min demo video · README with copy-paste "verify it
 yourself" · tech doc listing exact TxLINE endpoints used · TRUST_SURFACE.md + AUDIT.md · TxLINE API
 feedback note · `cargo kani` PASS transcript.

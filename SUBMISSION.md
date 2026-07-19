@@ -22,7 +22,7 @@ Prediction markets don't die from bad odds — they die from bad resolution. VAR
 
 Resolution is the single point of failure for every prediction market, and both incumbent designs fail it:
 
-- **Token-vote arbitration.** Polymarket/UMA's 2026 dispute crisis resolved a reported nine-figure contested market *against a filed 8-K* by plutocratic token vote — the side holding more tokens decided what "happened," not the facts. Resolution became a governance attack surface.
+- **Token-vote arbitration.** Polymarket/UMA's 2026 dispute crisis resolved a reported $60M+ contested market *against a filed 8-K* by plutocratic token vote — the side holding more tokens decided what "happened," not the facts. Resolution became a governance attack surface.
 - **Closed oracle pipes.** The alternative is to trust that Chainlink (or whoever) pushed the right number into a feed you cannot independently re-check. You get a receipt, not a proof.
 
 Both ask you to *trust*. Neither lets you *verify*. For a market of any size, "trust the token holders" and "trust the pipe" are not settlement — they're liabilities.
@@ -73,7 +73,7 @@ Every claim below is backed by evidence in the repo — clone it and re-run.
   - **INV-2** fee conservation — `fee + net == pot`, `net ≤ pot`, no payout ever exceeds `net`. The program cannot mint value.
   - **INV-3** settlement fail-closed — `Refund` and any out-of-range `fee_bps` always settle as a zero-fee full refund.
   - **INV-4** determinism — identical inputs always yield an identical resolution; no hidden state, clock, or randomness.
-- **Test suite** (`cargo test -p rulebook`): 25 unit tests + 12 golden real-World-Cup vectors (Argentina–France 2022 penalties → **Draw** on the 90' scoreline, VAR-disallowed goal, abandonment/postponement/void → Refund, zero-winning-pool refund) + 12,000 proptest cases (3 payout/solvency properties × 4,000 cases each, at full USDC magnitude).
+- **Test suite** (`cargo test -p rulebook`): 22 unit tests + 12 golden real-World-Cup vectors (Argentina–France 2022 penalties → **Draw** on the 90' scoreline, VAR-disallowed goal, abandonment/postponement/void → Refund, zero-winning-pool refund) + 3 proptest properties × 4,000 cases each (12,000 cases at full USDC magnitude).
 - **Deployed on devnet:** `var_settlement` = `AepSNpDzMUdBgjxA9irxxL7NTQHxXtDVq6rnqq17Lxk` (352KB, upgraded, upgrade authority = builder wallet).
 - **Live settlement against the real feed (devnet):** real fixture **18192996** (feed score home **2 – 3** away), authenticated via live Tx LINE `stat-validation` Merkle proofs and resolved by two-step CPI into the **real** `Txoracle` over the on-chain daily root (needs a 1.4M compute-unit budget — Merkle verification is CU-heavy). The two **goal counts** are Merkle-authenticated on-chain; the `Completed` match-status code is supplied by the resolver and fail-closed by the proven rulebook. Result: outcome **Away**, `reverify() → true`, winning pool paid pro-rata.
   - `attest_home` tx: `53dkuaseF6pAD71WDAaPUzwEQFQ6keWgRuafVM8DBqyvBZqWMwQg3GAtzbuJP5fSFYJ1rxpDKbE7HMK1AXtfbsws`
@@ -87,7 +87,7 @@ Every claim below is backed by evidence in the repo — clone it and re-run.
 - **GitHub repo:** https://github.com/JuanMarchetto/var-settlement
 - **Live `resolve` tx (Solana Explorer, devnet):** https://explorer.solana.com/tx/4j2ukzmW8rJNMAuCiyyKaiqksviB6mZS26e4FSfFuhBynV5mQXv8DMasLJUopv3XUC4BsFHQxPNPLPoj69oVtnyC?cluster=devnet
 - **Program (Solana Explorer, devnet):** https://explorer.solana.com/address/AepSNpDzMUdBgjxA9irxxL7NTQHxXtDVq6rnqq17Lxk?cluster=devnet
-- **Demo video:** _[placeholder — link to be added]_
+- **Demo video:** _added at submission time — until then, the live `resolve` tx above is the primary evidence_
 - **Verify it yourself:** `cargo test -p rulebook` · `cd crates/rulebook && cargo kani`
 
 ---

@@ -22,4 +22,4 @@ cluster = "Devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "echo 'litesvm/anchor integration tests: see programs/var-settlement (staged)'"
+test = "echo 'integration tests run on devnet: cd tests-devnet && bun install && bun run smoke.ts'"

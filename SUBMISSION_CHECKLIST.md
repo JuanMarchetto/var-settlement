@@ -6,8 +6,8 @@ Status for the same claims in narrative form.
 
 ## Foundation
 
-- [x] **Fresh in-window repo.** Single commit `c59db91` dated 2026-07-06, well inside the
-      submission window. No history predating the hackathon.
+- [x] **Fresh in-window repo.** First commit `c59db91` dated 2026-07-06; every commit in the
+      history is inside the hackathon submission window.
 - [x] **Spec written.** `spec.md` — thesis, scope, Tx LINE interface (verified against the IDL),
       architecture, rulebook state machine, Kani invariant list, threat model, deliverables.
 - [x] **Kani-proven core.** `crates/rulebook/src/lib.rs` — **4 proof harnesses PASS** (INV-1
@@ -15,7 +15,7 @@ Status for the same claims in narrative form.
       transcript `docs/KANI_PROOF_TRANSCRIPT.txt`. The winner-payout solvency bound (u128 symbolic
       division, intractable for CBMC) is covered by `tests/payout_props.rs` (12k proptest cases).
 - [x] **Program compiles.** `cargo check -p var-settlement` — clean, exit 0, on host.
-- [x] **Rulebook test suite green.** `cargo test -p rulebook` — 25 unit tests + golden-scenario test
+- [x] **Rulebook test suite green.** `cargo test -p rulebook` — 22 unit tests + golden-scenario test
       (12 real-World-Cup vectors) + 3 proptest properties (12k cases). All green.
 - [x] **TS SDK scaffolded.** `packages/sdk/src/txline.ts` — activation flow, PDA derivation
       (`dailyScoresRootsPda`), `StatWitness` assembly (`statWitness()`) implemented against the
@@ -43,18 +43,23 @@ Status for the same claims in narrative form.
 
 ## Remaining gates before submission
 
-- [ ] **Mainnet run** (real-time L12) and a `Completed`-status finished fixture for a production market.
-- [ ] **Record demo video.** `docs/DEMO_VIDEO_SCRIPT.md` is the shot list (hook → create/deposit →
-      resolve-with-proof → reverify green check → penalties/abandonment edge cases → `cargo kani`
-      PASS). Not recorded yet.
-- [ ] **README polish pass.** `README.md` is written and accurate as of this commit; revisit once
-      the devnet/mainnet run and video exist so status claims can move from "staged" to "done" and
-      the video gets embedded/linked.
-- [ ] **Public GitHub push.** Repo has no remote configured yet — currently local-only.
-- [ ] **Earn profile + KYC.** Superteam Earn submitter profile set up, KYC prepared (flagged in
-      `spec.md` §8 for an Argentina payout) ahead of the deadline, not day-of.
-- [ ] **Single submission before 2026-07-19.** One clean submission, not a last-minute scramble —
-      everything above closed with time to spare for the actual submit step.
+- [ ] **Record demo video.** `docs/DEMO_VIDEO_SCRIPT.md` is the shot list (hook → Kani PASS →
+      real-feed settlement → stranger-wallet reverify green check → Explorer). Not recorded yet —
+      the only open content gate.
+- [x] **README polish pass.** Done 2026-07-19: status claims moved from "staged" to "done" with
+      the devnet/live-feed evidence and tx links; Kani claims synced to the 4 verified harnesses;
+      two-step `attest_home` + `resolve` documented.
+- [x] **Public GitHub push.** Live and public at https://github.com/JuanMarchetto/var-settlement
+      (topics, description, homepage, and MIT license set).
+- [ ] **Earn profile ready.** Superteam Earn submitter profile set up ahead of the submit click.
+- [ ] **Single submission on 2026-07-19.** One clean submission — everything above closed, then
+      the actual submit step with the video link pasted into `SUBMISSION.md` and the Earn form.
+
+## Explicitly descoped (not submission gates)
+
+- **Mainnet run** (real-time L12) and a `Completed`-status finished fixture for a production
+  market. Devnet is the target and it's sufficient — Tx LINE's free World Cup tier is devnet L1,
+  and mainnet is not a hackathon requirement (see `SUBMISSION.md` §Honest status). Post-hackathon.
 
 ## Non-negotiable floor (per `spec.md` descope plan)
 

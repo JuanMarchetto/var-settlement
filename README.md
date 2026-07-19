@@ -1,8 +1,26 @@
 # VAR — Verifiable Automated Resolution
 
+![License: MIT](https://img.shields.io/badge/license-MIT-blue)
+![Kani: 4 proofs passing](https://img.shields.io/badge/Kani-4%20proofs%20passing-brightgreen)
+![Devnet: deployed](https://img.shields.io/badge/devnet-deployed%20%2B%20live%20settlement-brightgreen)
+![Anchor 0.32](https://img.shields.io/badge/Anchor-0.32-9945FF)
+
 Trustless, formally-verified settlement for FIFA World Cup 2026 1X2 (match-result) prediction
 markets on Solana. Built for the **Superteam World Cup Hackathon, Track 1: Prediction Markets &
-Settlement ($18,000)**. Data source: TxODDS **Tx LINE** (`Txoracle` program). Deadline: 2026-07-19.
+Settlement** (submitted 2026-07-19). Data source: TxODDS **Tx LINE** (`Txoracle` program).
+
+> **Proof it's real — open these first:**
+> - **Live real-feed settlement on devnet:** real fixture **18192996** settled against Tx LINE's
+>   on-chain Merkle root — [`resolve` tx on Solana Explorer](https://explorer.solana.com/tx/4j2ukzmW8rJNMAuCiyyKaiqksviB6mZS26e4FSfFuhBynV5mQXv8DMasLJUopv3XUC4BsFHQxPNPLPoj69oVtnyC?cluster=devnet)
+>   — outcome **Away**, winner paid pro-rata. Every signature: [`DEPLOYMENTS.md`](DEPLOYMENTS.md).
+> - **Permissionless re-verification:** a stranger wallet that never created, funded, or resolved
+>   the market re-derives the whole resolution and gets `true`:
+>   `cd tests-devnet && bun install && bun run reverify.ts A81iUQpYd5HuQvkyvpB8YjpvMQwVP8L7xuwak3a9TNYL`
+> - **4 Kani formal proofs, all PASS** — re-run in one command: `cd crates/rulebook && cargo kani`
+>   (committed transcript: [`docs/KANI_PROOF_TRANSCRIPT.txt`](docs/KANI_PROOF_TRANSCRIPT.txt)).
+> - **Program live on devnet:** [`AepSNpDzMUdBgjxA9irxxL7NTQHxXtDVq6rnqq17Lxk`](https://explorer.solana.com/address/AepSNpDzMUdBgjxA9irxxL7NTQHxXtDVq6rnqq17Lxk?cluster=devnet)
+>
+> Submission text: [`SUBMISSION.md`](SUBMISSION.md) · on-chain evidence: [`DEPLOYMENTS.md`](DEPLOYMENTS.md)
 
 ## The thesis
 
@@ -22,27 +40,35 @@ shipped.
 
 ## Architecture
 
+```mermaid
+flowchart LR
+    subgraph SDK["packages/sdk (TypeScript)"]
+        ACT["TxLineClient.activate()<br/>4-step free World Cup access"]
+        WIT["statWitness()<br/>fetches stat-validation Merkle proofs"]
+    end
+    subgraph PROG["programs/var-settlement (Anchor)"]
+        CM["create_market → Market PDA + USDC vault"]
+        DEP["deposit → escrow, pool totals"]
+        AH["attest_home(home witness)"]
+        RES["resolve(away witness, status)"]
+        CLM["claim → pro-rata payout"]
+        REV["reverify() → bool<br/>permissionless, read-only replay"]
+    end
+    subgraph RB["crates/rulebook (pure Rust — Kani-proven INV-1..4)"]
+        CORE["resolve_outcome + settle<br/>checked arithmetic, fail-closed"]
+    end
+    ORACLE["Tx LINE / Txoracle<br/>daily_scores_roots PDA<br/>(TxODDS on-chain Merkle feed)"]
+    WIT --> AH
+    WIT --> RES
+    AH -- "CPI validate_stat(EqualTo,<br/>threshold = home_goals)" --> ORACLE
+    RES -- "CPI validate_stat(EqualTo,<br/>threshold = away_goals)" --> ORACLE
+    RES --> CORE
+    CORE --> RCT["ResolutionReceipt<br/>(source root, ruleset hash,<br/>scoreline, outcome, split)"]
+    REV --> CORE
 ```
-  packages/sdk (TS)                crates/rulebook (Rust, pure)             programs/var-settlement (Anchor)
- ┌────────────────────────┐      ┌──────────────────────────────┐        ┌───────────────────────────────────┐
- │ TxLineClient            │      │ resolve_outcome()             │        │ create_market                       │
- │  .activate()   4-step   │      │   MatchState -> Outcome        │        │ deposit       USDC -> vault escrow  │
- │  .statWitness()   ────┐ │ ──►  │ settle() / winner_payout()    │  ◄──  │ resolve       CPI validate_stat x2   │
- │  dailyScoresRootsPda() │ │      │   Pools -> Settlement          │        │                -> rulebook::resolve │
- └────────────────────────┘ │      │ no_std-friendly, checked      │        │                -> ResolutionReceipt │
-                            │      │ arithmetic, fail-closed        │        │ claim         pro-rata payout       │
-                            │      │ + Kani proofs INV-1..4, 2b     │        │ reverify      permissionless replay │
-                            │      └──────────────────────────────┘        └──────────────────┬────────────────────┘
-                            │                     ▲ linked in unchanged                        │ CPI
-                            │ fetches stat-validation                                          │ validate_stat(
-                            │ Merkle proofs                                                     │  EqualTo,
-                            ▼                                                                   │  threshold=claimed_goals)
-                 ┌─────────────────────────────┐                                                │
-                 │ Tx LINE / Txoracle           │ ◄──────────────────────────────────────────────┘
-                 │ daily_scores_roots PDA       │
-                 │ (TxODDS on-chain feed)       │
-                 └─────────────────────────────┘
-```
+
+Settlement is **two transactions** (`attest_home`, then `resolve`) because the two Merkle proofs
+together exceed Solana's 1232-byte transaction limit.
 
 `crates/rulebook` is the moat: a pure, dependency-free Rust crate with no Solana imports. It
 compiles unchanged into the Anchor program *and* is independently checked with `cargo kani`. If the
@@ -57,14 +83,20 @@ create_market(fixture_id, kind=1X2, home_stat_key, away_stat_key, period, fee_bp
 deposit(outcome, amount)
     -> USDC transfers into the vault, updates the Position PDA + the market's pool totals
 
-resolve(home: StatWitness, away: StatWitness, status_code)     // permissionless, anyone can call
-    -> binds each witness to the market's configured stat_key/period (no cross-stat spoofing)
+attest_home(home: StatWitness)                                 // permissionless — step 1 of 2
+    -> binds the witness to the market's fixture_id / home_stat_key / period
+       (FixtureMismatch / StatKeyMismatch / StatPeriodMismatch — no cross-fixture or
+        cross-stat spoofing)
     -> CPIs Txoracle::validate_stat(EqualTo, threshold=home_goals) against daily_scores_merkle_roots
-    -> CPIs the same for away_goals
-    -> both must return true, or resolve fails closed (StatNotAuthenticated)
+    -> must return true, or it fails closed (StatNotAuthenticated); records the attested count
+
+resolve(away: StatWitness, status_code)                        // permissionless — step 2 of 2
+    -> same binding checks + CPI for away_goals
     -> runs rulebook::resolve(MatchState, Pools, fee_bps) -> Outcome + Settlement
     -> writes ResolutionReceipt (source_root, ruleset_hash, scoreline, outcome, payout split)
     -> flips Market.status = Settled, emits MarketResolved
+
+    (two steps because both Merkle proofs together exceed the 1232-byte tx limit)
 
 claim()
     -> per Position: pays floor(stake * net / winning_pool) for winners, or the full stake back
@@ -82,27 +114,31 @@ receipt is reproducible from scratch, not just internally consistent.
 
 ## The formal-verification moat
 
-`crates/rulebook` ships five Kani proofs (`crates/rulebook/src/lib.rs`, `#[cfg(kani)] mod proofs`),
-run with `cargo kani`:
+`crates/rulebook` ships four Kani proof harnesses (`crates/rulebook/src/lib.rs`,
+`#[cfg(kani)] mod proofs`), run with `cargo kani` — committed transcript at
+`docs/KANI_PROOF_TRANSCRIPT.txt`: `Complete - 4 successfully verified harnesses, 0 failures`:
 
 - **INV-1 — totality / fail-closed** (`inv1_resolve_outcome_total_and_correct`): `resolve_outcome`
   is total over the full input range — it always returns exactly one `Outcome`, never panics, and
   degenerate goal counts or a non-`Completed*` status always resolve to `Refund`.
-- **INV-2 — conservation** (`inv2_settlement_conserves`): `fee + net == pot` always, `net <= pot`
-  always, and no payout (full winning pool or any sub-stake) ever exceeds `net`. The program cannot
-  mint value — every unit paid out came from the pot.
-- **INV-2b — solvency under splitting** (`inv2b_two_winner_split_within_net`): any two disjoint
-  winner stakes drawn from the winning pool sum to no more than `net`, the induction base for
-  "the full set of winners can always be paid from escrow."
+- **INV-2 — conservation** (`inv2_settlement_conserves`): `pot == home + draw + away`,
+  `fee + net == pot`, and `net <= pot` always; refunds always carry `fee == 0`. The program cannot
+  mint value at the pool level — every unit paid out came from the pot.
 - **INV-3 — settlement fail-closed** (`inv3_settle_fail_closed`): `Outcome::Refund` and any
   `fee_bps > MAX_FEE_BPS` always settle as a full refund with `fee == 0`.
-- **INV-4 — determinism** (`inv4_resolve_deterministic`): identical `(MatchState, Pools, fee_bps)`
-  always yields an identical `Resolution` — no hidden state, no clock or randomness dependence.
+- **INV-4 — determinism** (`inv4_resolve_outcome_deterministic`): identical inputs always yield an
+  identical resolution — no hidden state, no clock or randomness dependence (`settle` is pure, so
+  settlement determinism follows).
 
-A sixth property, **no double-claim**, is enforced today by the `claimed` guard in
+The **per-winner payout bound** — no payout, or split of payouts, ever exceeds `net` — divides by a
+*symbolic* divisor at `u128` width, which is intractable for Kani's bit-blasting backend. It is
+covered instead by 3 property-test invariants × 4,000 cases each (12,000 cases at full USDC
+magnitude) in `crates/rulebook/tests/payout_props.rs`.
+
+A further property, **no double-claim**, is enforced by the `claimed` guard in
 `programs/var-settlement/src/lib.rs::claim()` (`require!(!p.claimed, ...)`); it's a program-level
-account-state property, not a pure-function one, so it's covered by the `litesvm` integration
-suite rather than Kani — see Current Status below for what's proven versus what's pending.
+account-state property, not a pure-function one, so it's outside Kani's scope — the claim path is
+exercised end-to-end on devnet by `tests-devnet/smoke.ts` (see `DEPLOYMENTS.md`).
 
 ## Tx LINE integration — exact interface used
 
@@ -133,8 +169,9 @@ Verified by hand against `txline.txodds.com/documentation` and the on-chain IDL 
     op:              Option<BinaryExpression>  // Add | Subtract
   ) -> bool
   ```
-  VAR calls it twice per `resolve`, once with `comparison = EqualTo, threshold = claimed home_goals`
-  and once for away — a `true` return means the claimed integer is the Merkle-authentic one.
+  VAR calls it twice per resolution — once in `attest_home` with `comparison = EqualTo, threshold =
+  claimed home_goals`, once in `resolve` for away — a `true` return means the claimed integer is
+  the Merkle-authentic one.
   Discriminator `[107, 197, 232, 90, 191, 136, 105, 185]` (from the IDL), invoked raw (not through a
   generated Anchor client) since `Txoracle` isn't a workspace dependency.
 - **`daily_scores_roots` PDA**: seeds `[b"daily_scores_roots", (epoch_day as u16).to_le_bytes()]`,
@@ -152,20 +189,27 @@ Verified by hand against `txline.txodds.com/documentation` and the on-chain IDL 
 
 ```
 spec.md                          full design spec — architecture, invariants, threat model
+SUBMISSION.md                     the hackathon submission text (pitch, evidence, links)
+DEPLOYMENTS.md                    every on-chain artifact: program IDs, deploy txs, settlement
+                                  signatures, re-run commands
 crates/rulebook/src/lib.rs        the verified core: types, resolve_outcome, settle,
                                   winner_payout, resolve, + Kani proofs (#[cfg(kani)])
-crates/rulebook/tests/            22 unit tests across outcome.rs / resolve.rs / settlement.rs
+crates/rulebook/tests/            22 unit tests + payout_props.rs (12,000 proptest cases)
 scenarios/*.json                  12 golden real-World-Cup vectors (golden.rs runs all of them)
-programs/var-settlement/src/lib.rs the Anchor program: create_market/deposit/resolve/claim/reverify,
-                                  the txoracle_cpi module, account/PDA layout
+programs/var-settlement/src/lib.rs the Anchor program: create_market/deposit/attest_home/resolve/
+                                  claim/reverify, the txoracle_cpi module, account/PDA layout
 packages/sdk/src/txline.ts         TS client: TxLINE activation, stat-validation fetch, PDA derivation
+tests-devnet/                     devnet integration suite: smoke.ts (full lifecycle),
+                                  txline-activate.ts + txline-settle.ts (live real-feed settlement),
+                                  reverify.ts (stranger-wallet re-verification)
+idl/var_settlement.json           the program's own IDL
 docs/idl/txoracle_mainnet.json    the Txoracle IDL this integration was built against
+docs/KANI_PROOF_TRANSCRIPT.txt    committed cargo-kani transcript (4 harnesses, 0 failures)
 docs/TRUST_SURFACE.md             trusted vs. untrusted, threat model, fail-closed behavior
 docs/AUDIT.md                     self-audit: proven invariants, arithmetic discipline, limitations
 docs/DEMO_VIDEO_SCRIPT.md         3-minute demo shot list
 docs/TXLINE_API_FEEDBACK.md       builder feedback on the Tx LINE API/docs
 SUBMISSION_CHECKLIST.md           gate list toward the 2026-07-19 Earn submission
-tests/                            reserved for litesvm/anchor integration tests (not yet written)
 ```
 
 ## Verify it yourself
@@ -173,7 +217,8 @@ tests/                            reserved for litesvm/anchor integration tests 
 No trust required — clone and run the proven core directly.
 
 ```bash
-# 22 unit tests + the 12-scenario golden suite (real World Cup matches, hand-checked expected outcomes)
+# 22 unit tests + the 12-scenario golden suite (real World Cup matches, hand-checked expected
+# outcomes) + 12,000 property-test payout cases
 cargo test -p rulebook
 
 # formal proofs: totality, conservation, fail-closed, determinism (crates/rulebook/src/lib.rs)
@@ -183,30 +228,49 @@ cargo kani -p rulebook
 cargo check -p var-settlement
 ```
 
+And the highest-signal 30 seconds: re-run the **permissionless reverify** against the real-fixture
+market already settled on devnet — from any wallet, even one that never touched the market:
+
+```bash
+cd tests-devnet && bun install
+bun run reverify.ts A81iUQpYd5HuQvkyvpB8YjpvMQwVP8L7xuwak3a9TNYL   # -> reverify -> true
+```
+
 `cargo test -p rulebook` is fast and deterministic. `cargo kani -p rulebook` runs Kani's bounded
-model checker over all five proof harnesses — expect it to take real time (bounded exhaustive
+model checker over all four proof harnesses — expect it to take real time (bounded exhaustive
 search, not a fuzz run) since it explores the full input range per `kani::assume` bound, not a
 sample.
 
 ## Current status (honest)
 
-**Verified and passing today:**
-- `cargo test -p rulebook` — 22 unit tests + the golden-scenario test (12 real-WC vectors) all green.
-- Kani proofs INV-1, INV-2, INV-2b, INV-3, INV-4 are written and running against the pure rulebook.
-- `cargo check -p var-settlement` — the Anchor program compiles clean on host, exit 0.
-- Tx LINE's self-serve free World Cup tier (4-step activation) is verified reachable and documented;
-  the TS client (`packages/sdk/src/txline.ts`) implements activation and stat-witness assembly.
+**Verified and passing today** (every claim backed by a signature in `DEPLOYMENTS.md` — clone and
+re-run):
+- **4 Kani proofs PASS** — `cargo kani -p rulebook`, transcript committed at
+  `docs/KANI_PROOF_TRANSCRIPT.txt` (`Complete - 4 successfully verified harnesses, 0 failures`).
+- `cargo test -p rulebook` — 22 unit tests + 12 golden real-WC vectors + 12,000 proptest payout
+  cases, all green. `cargo check -p var-settlement` — clean, exit 0.
+- **Deployed on devnet:** [`AepSNpDzMUdBgjxA9irxxL7NTQHxXtDVq6rnqq17Lxk`](https://explorer.solana.com/address/AepSNpDzMUdBgjxA9irxxL7NTQHxXtDVq6rnqq17Lxk?cluster=devnet).
+- **End-to-end devnet smoke test PASSED** (`tests-devnet/smoke.ts`): full
+  `create → deposit → resolve → reverify → claim` lifecycle with real SPL transfers; final
+  balances 158 / 40 / 2 (the 2% fee) match the rulebook math exactly.
+- **LIVE settlement of a real fixture against the real feed:** fixture **18192996** (home 2 – 3
+  away) authenticated via live Tx LINE `stat-validation` Merkle proofs and settled by two-step CPI
+  into the **real** devnet `Txoracle` over the on-chain daily root —
+  [`resolve` tx](https://explorer.solana.com/tx/4j2ukzmW8rJNMAuCiyyKaiqksviB6mZS26e4FSfFuhBynV5mQXv8DMasLJUopv3XUC4BsFHQxPNPLPoj69oVtnyC?cluster=devnet),
+  outcome **Away**, winner paid. A stranger wallet re-derives it: `reverify() → true`.
+- Tx LINE's free World Cup tier (4-step activation) run live end-to-end — activation tx in
+  `DEPLOYMENTS.md`.
 
-**Staged, not done — next in line:**
-- SBF build (`cargo build-sbf` / `anchor build`) for the program.
-- `litesvm` integration tests (happy path, double-claim guard, early-resolve guard, refund path).
-- Devnet deploy of `programs/var-settlement` under program ID
-  `AepSNpDzMUdBgjxA9irxxL7NTQHxXtDVq6rnqq17Lxk` (declared in `declare_id!`, not yet deployed —
-  `target/deploy/` has only the keypair, no built `.so`).
-- Live Tx LINE devnet/mainnet activation — the 4-step flow is coded and verified against the docs,
-  but running it end-to-end needs a funded wallet (`subscribe()` in `txline.ts` is a stub that
-  throws until wired against a live wallet).
-- Demo video — not recorded yet. `docs/DEMO_VIDEO_SCRIPT.md` is the script for it.
+**Open, flagged not hidden:**
+- **Match status is a resolver input, not oracle-authenticated.** The two goal counts are
+  Merkle-authenticated on-chain; the status code is caller-supplied, and the proven rulebook
+  fail-closes every non-`Completed` status to `Refund` (INV-1) — the worst a caller can force is a
+  refund, never a fabricated decisive result. Binding status to an authenticated feed field is the
+  gap to close before mainnet (`docs/AUDIT.md`).
+- **Demo video** — script ready at `docs/DEMO_VIDEO_SCRIPT.md`, recording pending.
+- **Mainnet L12** (real-time, sub-second) — descoped for the hackathon: the free World Cup access
+  grant is devnet L1, and mainnet is a wiring follow-up (same activation + CPI path), not a core
+  change.
 
 Nothing here claims more than what's been run. See `SUBMISSION_CHECKLIST.md` for the full gate list.
 

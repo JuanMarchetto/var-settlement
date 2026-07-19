@@ -7,19 +7,26 @@ with, not hiding.
 
 ## Invariants proven with Kani
 
-All five run against the pure `rulebook` crate (`crates/rulebook/src/lib.rs`,
-`#[cfg(kani)] mod proofs`), via `cargo kani -p rulebook`:
+All four run against the pure `rulebook` crate (`crates/rulebook/src/lib.rs`,
+`#[cfg(kani)] mod proofs`), via `cargo kani -p rulebook` — transcript at
+`docs/KANI_PROOF_TRANSCRIPT.txt`: `Complete - 4 successfully verified harnesses, 0 failures`:
 
 | ID | Name | Harness | What it rules out |
 |----|------|---------|--------------------|
 | INV-1 | Totality / fail-closed | `inv1_resolve_outcome_total_and_correct` | Panics on any input in the swept range (`home_goals`, `away_goals` in `[-3, 20]`, all 6 `MatchStatus` variants); wrong 90' mapping; a non-`Completed*` status resolving to anything but `Refund` |
-| INV-2 | Conservation | `inv2_settlement_conserves` | Minting value: asserts `fee + net == pot`, `net <= pot`, and no payout (full winning pool or any sub-stake up to it) exceeds `net` |
-| INV-2b | Solvency under splitting | `inv2b_two_winner_split_within_net` | Two disjoint winner stakes summing to more than `net` between them — the base case for "the whole winner set can be paid from escrow" |
+| INV-2 | Conservation | `inv2_settlement_conserves` | Minting value at the pool level: asserts `pot == home + draw + away`, `fee + net == pot`, `net <= pot`, `fee <= pot`, and refunds always carry `fee == 0, net == 0` |
 | INV-3 | Settlement fail-closed | `inv3_settle_fail_closed` | `Outcome::Refund` or an out-of-range `fee_bps` producing anything but a zero-fee full refund |
-| INV-4 | Determinism | `inv4_resolve_deterministic` | Any hidden state — identical `(MatchState, Pools, fee_bps)` asserted to always produce an identical `Resolution` |
+| INV-4 | Determinism | `inv4_resolve_outcome_deterministic` | Any hidden state — identical inputs asserted to always produce an identical resolution (`settle` is pure, so settlement determinism follows) |
+
+**Not in Kani, by design:** the per-winner payout bound (`winner_payout <= net`, including any
+split among winners) divides by a *symbolic* divisor at `u128` width, which CBMC must bit-blast —
+intractable. It is covered instead by the randomized property suite
+`crates/rulebook/tests/payout_props.rs`: 3 solvency/payout properties × 4,000 cases each (12,000
+cases at full USDC magnitudes). See the inline comment in `inv2_settlement_conserves` for the
+rationale.
 
 These are exhaustive over the bounded ranges Kani sweeps (`kani::assume` bounds: goals `-3..=20`,
-pool values `<= 500` or `<=1000` depending on harness, `fee_bps <= MAX_FEE_BPS`), not sampled —
+pool values `<= 1000`, `fee_bps <= MAX_FEE_BPS`), not sampled —
 Kani's bounded model checker explores the full state space within those bounds. Widening the bounds
 further (e.g. arbitrary `u64` pool values instead of `<=1000`) is a cheap follow-up; the current
 bounds were chosen to keep proof runtime reasonable while still covering every code path (every
@@ -27,8 +34,9 @@ branch in `resolve_outcome` and `settle` is exercised at the boundary values).
 
 **What Kani does *not* cover:** anything inside `programs/var-settlement` — Solana account
 handling, CPI serialization, PDA derivation, the `claimed` guard. Kani proves properties of pure
-functions; it doesn't model an Anchor program's account graph. Those properties are covered (or, in
-the pending cases below, will be covered) by ordinary tests and `litesvm` integration tests instead.
+functions; it doesn't model an Anchor program's account graph. Those properties are covered by
+ordinary tests and the devnet integration suite (`tests-devnet/smoke.ts`, full lifecycle with real
+SPL transfers — see `DEPLOYMENTS.md`) instead.
 
 ## Checked-arithmetic / overflow discipline
 
@@ -66,9 +74,9 @@ if amount == 0 { return Ok(()); }
 `claimed` is set to `true` before the transfer executes and regardless of whether `amount` turns out
 to be zero, so a second call to `claim()` against the same `Position` always errors out before
 touching the vault. This is a straightforward account-state guard, not (yet) formally proven — see
-Known Limitations. It's exercised by `crates/rulebook/tests/resolve.rs` at the settlement-math
-level (`winner_payout` idempotence isn't the same as the account guard) but the account-level
-guard itself needs the pending `litesvm` suite to be test-covered end to end.
+Known Limitations. The happy-path `claim` is exercised end-to-end on devnet by
+`tests-devnet/smoke.ts` (both winner and loser claims, real SPL transfers); an explicit
+second-claim-must-fail devnet test is a cheap follow-up an auditor should ask for.
 
 ## Stat-key binding (anti cross-stat-spoofing)
 
@@ -118,19 +126,25 @@ gate. The deadline/grace window bounds the other side (how late is too late), no
    (including its error paths) the way the IDL implies. We have not independently fuzzed
    `Txoracle`'s return-data behavior — that program is out of our control and out of scope for this
    audit; we treat it as the trusted data source (see `docs/TRUST_SURFACE.md`).
-3. **Single market type in V1.** Only 1X2 (`MARKET_KIND_1X2 = 0`) is implemented; `create_market`
-   rejects anything else (`UnsupportedMarketKind`). The rulebook's `MatchState`/`Outcome` types are
-   designed to extend to Over/Under, correct-score, etc. (see `spec.md` §1), but that extension is
-   unbuilt. An auditor should not assume any other market kind has been reviewed — it doesn't exist
-   yet.
+3. **Single market type in V1 — and `market_kind` is a nonce, not a validated enum.** Every market
+   resolves as 1X2; `create_market` does *not* validate `market_kind` — it is deliberately
+   repurposed as a per-fixture nonce in the Market PDA seeds so one fixture can host multiple
+   market accounts (see the comment in `create_market`; `tests-devnet/txline-settle.ts` relies on
+   this). The `UnsupportedMarketKind` error variant is defined but currently unused (reserved for
+   when kinds beyond 1X2 exist). The rulebook's `MatchState`/`Outcome` types are designed to extend
+   to Over/Under, correct-score, etc. (see `spec.md` §1), but that extension is unbuilt — an
+   auditor should not assume any other market kind has been reviewed.
 4. **No program-level Kani coverage (see table above).** The `claimed` guard, the deadline check,
    and the stat-key binding are conventional `require!` guards, not machine-proven. They're simple
    enough to review by hand (each is a single boolean condition gating a single side effect) but an
    external auditor should treat them with ordinary scrutiny, not assume Kani's guarantees extend to
    them.
-5. **No live devnet/mainnet run yet.** Everything above is verified against the pure rulebook and a
-   clean host compile. The program has not been built for SBF, deployed, or exercised against a real
-   `Txoracle` CPI on a live cluster. See `README.md` Current Status and `SUBMISSION_CHECKLIST.md`.
+5. **Devnet only — no mainnet run yet.** The program *is* built for SBF, deployed on devnet
+   (`AepSNpDzMUdBgjxA9irxxL7NTQHxXtDVq6rnqq17Lxk`), exercised end-to-end by
+   `tests-devnet/smoke.ts`, and has settled a real fixture (18192996) against the **real**
+   `Txoracle` CPI over the live on-chain daily Merkle root — see `DEPLOYMENTS.md` for every tx
+   signature. What remains is a mainnet (real-time L12) run, which changes cluster and service
+   tier, not code.
 6. **`ResolutionReceipt` binds to `source_root` derived from the two `events_sub_tree_root` values
    hashed together, not the full daily main root.** This is enough to detect if either side's
    witness changes, but an auditor verifying the receipt against the chain independently should know
@@ -147,16 +161,18 @@ In priority order:
    actually expects once its real accounts (beyond the PDA) are known, and confirm there's no way to
    pass a `daily_scores_merkle_roots` account for a different epoch-day than the one implied by
    `witness.ts`.
-2. **The stat-key/period binding** — confirm there's no path where a `home` witness and an `away`
-   witness could reference stats from two different fixtures, since only the *key*/*period* are
-   checked against the market, not the fixture ID inside `fixture_summary`. (Note: this is a real
-   gap worth flagging — see the follow-up note below.)
+2. **The fixture/stat-key/period binding** — verify the three-way binding holds as implemented:
+   `attest_home` asserts `home.summary.fixture_id == m.fixture_id` and `resolve` asserts
+   `away.summary.fixture_id == m.fixture_id` (`VarError::FixtureMismatch`), on top of the
+   stat-key/period checks, so a cross-fixture home/away witness pair is transitively rejected.
+   (This was a real gap found and closed during this audit — see the resolution note below.)
 3. **The Kani proof bounds** — are `-3..=20` goals and `<=500`/`<=1000` pool values wide enough to
    call this "exhaustive in practice," or should they be widened before calling INV-1..4 airtight for
    mainnet-scale pools?
-4. **The `litesvm` suite once it exists** — does it actually exercise the double-claim guard, the
-   early/late resolve boundary, and the refund path against real account state, or just re-test the
-   rulebook math a second time?
+4. **The devnet integration suite** (`tests-devnet/`) — `smoke.ts` covers the full happy path with
+   real account state and SPL transfers; what it does *not* yet cover is a second-claim-must-fail
+   attempt, the early/late resolve boundary, and the refund path exercised on-chain. Those are the
+   cheap follow-up tests to demand before mainnet.
 
 **Resolved during this audit:** each witness is now bound on-chain to the market's own
 `fixture_id` — `attest_home` asserts `home.summary.fixture_id == m.fixture_id` and `resolve`
